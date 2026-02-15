@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Subtitle Mixer",
+  "version": "1.0.0",
+  "description": "Randomly replaces a small portion of YouTube subtitle words with translated words.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://libretranslate.de/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Subtitle Mixer"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/watch*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
