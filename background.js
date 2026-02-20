@@ -1,5 +1,6 @@
 const LIBRETRANSLATE_API = "https://libretranslate.de/translate";
 const MYMEMORY_API = "https://api.mymemory.translated.net/get";
+const GOOGLE_TRANSLATE_API = "https://translate.googleapis.com/translate_a/single";
 
 async function translateWithLibreTranslate(words, targetLanguage) {
   const query = words.join("\n");
@@ -26,13 +27,47 @@ async function translateWithLibreTranslate(words, targetLanguage) {
   return words.map((original, index) => split[index] || original);
 }
 
+async function translateWordWithMyMemory(word, targetLanguage) {
+  const url = new URL(MYMEMORY_API);
+  url.searchParams.set("q", word);
+  url.searchParams.set("langpair", `auto|${targetLanguage}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`MyMemory failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data?.responseData?.translatedText;
+  if (typeof result === "string" && result.trim()) {
+    return result;
+  }
+
+  throw new Error("MyMemory returned empty translation");
+}
+
 async function translateWithMyMemory(words, targetLanguage) {
+  return Promise.all(
+    words.map(async (word) => {
+      try {
+        return await translateWordWithMyMemory(word, targetLanguage);
+      } catch {
+        return word;
+      }
+    })
+  );
+}
+
+async function translateWithGoogle(words, targetLanguage) {
   const translated = [];
 
   for (const word of words) {
-    const url = new URL(MYMEMORY_API);
+    const url = new URL(GOOGLE_TRANSLATE_API);
+    url.searchParams.set("client", "gtx");
+    url.searchParams.set("sl", "auto");
+    url.searchParams.set("tl", targetLanguage);
+    url.searchParams.set("dt", "t");
     url.searchParams.set("q", word);
-    url.searchParams.set("langpair", `en|${targetLanguage}`);
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -41,8 +76,8 @@ async function translateWithMyMemory(words, targetLanguage) {
     }
 
     const data = await response.json();
-    const result = data?.responseData?.translatedText;
-    translated.push(typeof result === "string" && result.trim() ? result : word);
+    const translatedText = data?.[0]?.map((part) => part?.[0]).join("")?.trim();
+    translated.push(translatedText || word);
   }
 
   return translated;
@@ -52,7 +87,11 @@ async function translateBatch(words, targetLanguage) {
   try {
     return await translateWithLibreTranslate(words, targetLanguage);
   } catch {
-    return translateWithMyMemory(words, targetLanguage);
+    try {
+      return await translateWithMyMemory(words, targetLanguage);
+    } catch {
+      return translateWithGoogle(words, targetLanguage);
+    }
   }
 }
 

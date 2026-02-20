@@ -163,9 +163,7 @@
     const shuffled = [...words].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, targetCount);
 
-    const translations = await Promise.all(
-      selected.map((word) => translator.translateWord(word.value))
-    );
+    const translations = await Promise.all(selected.map((word) => translator.translateWord(word.value)));
 
     const replacementMap = new Map();
     for (let i = 0; i < selected.length; i += 1) {
@@ -186,19 +184,33 @@
     return output + text.slice(cursor);
   }
 
+  function getSourceText(node) {
+    const currentText = node.textContent || "";
+    const original = node.dataset.subtitleMixerOriginal;
+    const translated = node.dataset.subtitleMixerTranslated;
+
+    if (original && translated && currentText === translated) {
+      return original;
+    }
+
+    return currentText;
+  }
+
   async function processSubtitleNode(node) {
-    const currentText = node.textContent;
-    if (!currentText || !currentText.trim()) {
+    const sourceText = getSourceText(node);
+    if (!sourceText || !sourceText.trim()) {
       return;
     }
 
-    const alreadyProcessed = node.dataset.subtitleMixerOriginal;
-    const sourceText = alreadyProcessed || currentText;
     const cacheKey = `${targetLanguage}|${sourceText}`;
 
     if (processedLineCache.has(cacheKey)) {
-      node.textContent = processedLineCache.get(cacheKey);
+      const cached = processedLineCache.get(cacheKey);
+      if (node.textContent !== cached) {
+        node.textContent = cached;
+      }
       node.dataset.subtitleMixerOriginal = sourceText;
+      node.dataset.subtitleMixerTranslated = cached;
       return;
     }
 
@@ -206,6 +218,7 @@
     processedLineCache.set(cacheKey, translated);
     node.textContent = translated;
     node.dataset.subtitleMixerOriginal = sourceText;
+    node.dataset.subtitleMixerTranslated = translated;
 
     if (processedLineCache.size > 500) {
       const firstKey = processedLineCache.keys().next().value;
@@ -215,7 +228,7 @@
 
   function getSubtitleNodes() {
     return document.querySelectorAll(
-      ".ytp-caption-window-container .ytp-caption-segment, .caption-window .captions-text span"
+      ".ytp-caption-window-container .ytp-caption-segment, .caption-window .captions-text span, .ytp-caption-segment"
     );
   }
 
@@ -231,6 +244,14 @@
     targetLanguage = stored[STORAGE_KEY] || "es";
   }
 
+  function clearSubtitleState() {
+    document.querySelectorAll("[data-subtitle-mixer-original]").forEach((node) => {
+      node.textContent = node.dataset.subtitleMixerOriginal || node.textContent;
+      delete node.dataset.subtitleMixerOriginal;
+      delete node.dataset.subtitleMixerTranslated;
+    });
+  }
+
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync" || !changes[STORAGE_KEY]) {
       return;
@@ -239,20 +260,24 @@
     targetLanguage = changes[STORAGE_KEY].newValue || "es";
     translator.clear();
     processedLineCache.clear();
-
-    document
-      .querySelectorAll("[data-subtitle-mixer-original]")
-      .forEach((node) => {
-        node.textContent = node.dataset.subtitleMixerOriginal || node.textContent;
-      });
-
+    clearSubtitleState();
     handleMutations();
   });
 
   async function init() {
     await loadLanguagePreference();
 
+    let lastVideoId = new URL(window.location.href).searchParams.get("v") || "";
+
     const observer = new MutationObserver(() => {
+      const currentVideoId = new URL(window.location.href).searchParams.get("v") || "";
+      if (currentVideoId !== lastVideoId) {
+        lastVideoId = currentVideoId;
+        translator.clear();
+        processedLineCache.clear();
+        clearSubtitleState();
+      }
+
       handleMutations();
     });
 
