@@ -86,6 +86,25 @@ async function translateWordWithMyMemory(word, targetLanguage) {
   return result;
 }
 
+async function translateWordWithMyMemory(word, targetLanguage) {
+  const url = new URL(MYMEMORY_API);
+  url.searchParams.set("q", word);
+  url.searchParams.set("langpair", `auto|${targetLanguage}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`MyMemory failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data?.responseData?.translatedText;
+  if (typeof result === "string" && result.trim()) {
+    return result;
+  }
+
+  throw new Error("MyMemory returned empty translation");
+}
+
 async function translateWithMyMemory(words, targetLanguage) {
   const translated = await Promise.all(
     words.map(async (word) => {
