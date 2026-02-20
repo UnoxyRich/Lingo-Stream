@@ -69,6 +69,8 @@ async function translateWithLibreTranslate(words, targetLanguage) {
 async function translateWordWithMyMemory(word, targetLanguage) {
   const url = new URL(MYMEMORY_API);
   url.searchParams.set("q", word);
+  // MyMemory does not accept `auto` as source language and returns an error string.
+  // Use a stable source language for fallback behavior and reject bad payloads.
   url.searchParams.set("langpair", `en|${targetLanguage}`);
 
   const response = await fetch(url);
@@ -84,25 +86,6 @@ async function translateWordWithMyMemory(word, targetLanguage) {
   }
 
   return result;
-}
-
-async function translateWordWithMyMemory(word, targetLanguage) {
-  const url = new URL(MYMEMORY_API);
-  url.searchParams.set("q", word);
-  url.searchParams.set("langpair", `auto|${targetLanguage}`);
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`MyMemory failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const result = data?.responseData?.translatedText;
-  if (typeof result === "string" && result.trim()) {
-    return result;
-  }
-
-  throw new Error("MyMemory returned empty translation");
 }
 
 async function translateWithMyMemory(words, targetLanguage) {
@@ -153,9 +136,9 @@ async function translateBatch(words, targetLanguage) {
     return await translateWithLibreTranslate(words, targetLanguage);
   } catch {
     try {
-      return await translateWithMyMemory(words, targetLanguage);
+      return await translateWithGoogle(words, targetLanguage);
     } catch {
-      return translateWithGoogle(words, targetLanguage);
+      return translateWithMyMemory(words, targetLanguage);
     }
   }
 }
