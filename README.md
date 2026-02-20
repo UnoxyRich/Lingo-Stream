@@ -1,15 +1,18 @@
 # YouTube Subtitle Mixer Extension
 
-A Manifest v3 Chrome extension that runs on YouTube watch pages and randomly swaps about 5–10% of subtitle words with translated words in your selected target language.
+A Manifest v3 Chrome extension that runs on YouTube watch pages and randomly swaps about 8–16% of subtitle words with translated words in your selected target language.
 
 ## Features
 
 - Works only on `https://www.youtube.com/watch*` pages.
 - Detects subtitle updates in real time using `MutationObserver`.
-- Randomly replaces a small subset (5–10%) of subtitle words.
+- Randomly replaces a small subset of subtitle words.
 - Popup UI to choose a target language.
 - Persists language preference via Chrome storage (`chrome.storage.sync`).
-- Uses free LibreTranslate public API (no API key required).
+- Uses a background service worker for translation requests (avoids CORS issues from content scripts).
+- Uses provider fallback:
+  - Primary: LibreTranslate public API.
+  - Secondary fallback: MyMemory API.
 - Includes request throttling, batching, and local cache to reduce API calls.
 
 ## Install as an Unpacked Extension
@@ -28,48 +31,27 @@ A Manifest v3 Chrome extension that runs on YouTube watch pages and randomly swa
 3. The new language is saved automatically.
 4. Return to the YouTube tab; new subtitle updates use the selected language.
 
-## Free API Usage (LibreTranslate)
+## Translation APIs
 
-This extension calls the public LibreTranslate instance:
+This extension calls the following free public services from the extension service worker:
 
-- Endpoint: `https://libretranslate.de/translate`
-- Method: `POST`
-- Body params:
-  - `q`: text to translate (batched words joined by newlines)
-  - `source`: `auto`
-  - `target`: selected language code
-  - `format`: `text`
+- `https://libretranslate.de/translate`
+- `https://api.mymemory.translated.net/get`
 
-No API key is required.
+If LibreTranslate fails, the extension automatically falls back to MyMemory.
 
-## Rate Limit and Reliability Notes
+## Reliability Notes
 
-Because this uses a public free instance:
+Because this uses public free instances:
 
 - You may occasionally see slow responses.
 - You may hit temporary rate limits if traffic is high.
-- The extension reduces request volume using:
-  - basic request interval throttling,
-  - batching multiple words per request,
-  - in-memory cache of previously translated words.
 
-## Self-Host LibreTranslate (Recommended for Unlimited/Private Usage)
+The extension reduces request volume using:
 
-To avoid public API limits, run LibreTranslate locally.
-
-### Quick Docker example
-
-```bash
-docker run -d -p 5000:5000 libretranslate/libretranslate
-```
-
-Then update `API_ENDPOINT` in `content.js` to:
-
-```js
-const API_ENDPOINT = "http://localhost:5000/translate";
-```
-
-Reload the extension in `chrome://extensions` after the change.
+- basic request interval throttling,
+- batching multiple words per request,
+- in-memory cache of previously translated words.
 
 ---
 
