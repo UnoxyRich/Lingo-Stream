@@ -2,6 +2,35 @@ const LIBRETRANSLATE_API = "https://libretranslate.de/translate";
 const MYMEMORY_API = "https://api.mymemory.translated.net/get";
 const GOOGLE_TRANSLATE_API = "https://translate.googleapis.com/translate_a/single";
 
+const INVALID_TRANSLATION_PATTERNS = [
+  "INVALID SOURCE LANGUAGE",
+  "EXAMPLE: LANGPAIR",
+  "RFC3066",
+  "ALMOST ALL LANGUAGES SUPPORTED"
+];
+
+function isValidTranslation(original, candidate) {
+  if (typeof candidate !== "string") {
+    return false;
+  }
+
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const upper = trimmed.toUpperCase();
+  if (INVALID_TRANSLATION_PATTERNS.some((pattern) => upper.includes(pattern))) {
+    return false;
+  }
+
+  if (trimmed.length > Math.max(80, original.length * 8)) {
+    return false;
+  }
+
+  return true;
+}
+
 async function translateWithLibreTranslate(words, targetLanguage) {
   const query = words.join("\n");
   const response = await fetch(LIBRETRANSLATE_API, {
@@ -24,7 +53,37 @@ async function translateWithLibreTranslate(words, targetLanguage) {
   const data = await response.json();
   const translatedText = typeof data.translatedText === "string" ? data.translatedText : "";
   const split = translatedText.split("\n").map((part) => part.trim());
-  return words.map((original, index) => split[index] || original);
+
+  const result = words.map((original, index) => {
+    const candidate = split[index];
+    return isValidTranslation(original, candidate) ? candidate : original;
+  });
+
+  if (result.every((value, index) => value === words[index])) {
+    throw new Error("LibreTranslate returned unusable results");
+  }
+
+  return result;
+}
+
+async function translateWordWithMyMemory(word, targetLanguage) {
+  const url = new URL(MYMEMORY_API);
+  url.searchParams.set("q", word);
+  url.searchParams.set("langpair", `en|${targetLanguage}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`MyMemory failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data?.responseData?.translatedText;
+
+  if (!isValidTranslation(word, result)) {
+    throw new Error("MyMemory returned invalid translation");
+  }
+
+  return result;
 }
 
 async function translateWordWithMyMemory(word, targetLanguage) {
@@ -47,7 +106,7 @@ async function translateWordWithMyMemory(word, targetLanguage) {
 }
 
 async function translateWithMyMemory(words, targetLanguage) {
-  return Promise.all(
+  const translated = await Promise.all(
     words.map(async (word) => {
       try {
         return await translateWordWithMyMemory(word, targetLanguage);
@@ -56,6 +115,12 @@ async function translateWithMyMemory(words, targetLanguage) {
       }
     })
   );
+
+  if (translated.every((value, index) => value === words[index])) {
+    throw new Error("MyMemory returned no usable translations");
+  }
+
+  return translated;
 }
 
 async function translateWithGoogle(words, targetLanguage) {
@@ -77,7 +142,7 @@ async function translateWithGoogle(words, targetLanguage) {
 
     const data = await response.json();
     const translatedText = data?.[0]?.map((part) => part?.[0]).join("")?.trim();
-    translated.push(translatedText || word);
+    translated.push(isValidTranslation(word, translatedText) ? translatedText : word);
   }
 
   return translated;

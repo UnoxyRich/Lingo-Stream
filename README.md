@@ -15,6 +15,7 @@ A Manifest v3 Chrome extension that runs on YouTube watch pages and randomly swa
   - Secondary fallback: MyMemory API.
   - Tertiary fallback: Google Translate endpoint.
 - Includes request throttling, batching, and local cache to reduce API calls.
+- Rejects invalid API error payloads so provider error messages are never written into subtitles.
 
 ## Install as an Unpacked Extension
 
