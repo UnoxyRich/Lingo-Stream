@@ -13,7 +13,9 @@ A Manifest v3 Chrome extension that runs on YouTube watch pages and randomly swa
 - Uses provider fallback:
   - Primary: LibreTranslate public API.
   - Secondary fallback: MyMemory API.
+  - Tertiary fallback: Google Translate endpoint.
 - Includes request throttling, batching, and local cache to reduce API calls.
+- Rejects invalid API error payloads so provider error messages are never written into subtitles.
 
 ## Install as an Unpacked Extension
 
@@ -37,8 +39,9 @@ This extension calls the following free public services from the extension servi
 
 - `https://libretranslate.de/translate`
 - `https://api.mymemory.translated.net/get`
+- `https://translate.googleapis.com/translate_a/single`
 
-If LibreTranslate fails, the extension automatically falls back to MyMemory.
+If LibreTranslate fails, the extension falls back to MyMemory, then Google Translate.
 
 ## Reliability Notes
 

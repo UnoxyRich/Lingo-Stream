@@ -3,10 +3,13 @@
   "name": "YouTube Subtitle Mixer",
   "version": "1.1.0",
   "description": "Randomly replaces a small portion of YouTube subtitle words with translated words.",
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://libretranslate.de/*",
-    "https://api.mymemory.translated.net/*"
+    "https://api.mymemory.translated.net/*",
+    "https://translate.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -17,8 +20,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.youtube.com/watch*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://www.youtube.com/watch*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ]
