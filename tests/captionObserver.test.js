@@ -1,6 +1,76 @@
 import { describe, expect, it, vi } from 'vitest';
 
+function createMockElement(tagName) {
+  return {
+    tagName,
+    id: '',
+    textContent: '',
+    innerText: '',
+    children: [],
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    }
+  };
+}
+
+function createMockDocument() {
+  const elementsById = new Map();
+
+  const head = {
+    children: [],
+    appendChild(node) {
+      this.children.push(node);
+      if (node.id) {
+        elementsById.set(node.id, node);
+      }
+      return node;
+    }
+  };
+
+  const player = {
+    children: [],
+    appendChild(node) {
+      this.children.push(node);
+      if (node.id) {
+        elementsById.set(node.id, node);
+      }
+      return node;
+    }
+  };
+
+  const body = {
+    children: [],
+    appendChild(node) {
+      this.children.push(node);
+      if (node.id) {
+        elementsById.set(node.id, node);
+      }
+      return node;
+    }
+  };
+
+  return {
+    head,
+    body,
+    player,
+    createElement(tagName) {
+      return createMockElement(tagName);
+    },
+    getElementById(id) {
+      return elementsById.get(id) || null;
+    },
+    querySelector(selector) {
+      if (selector === '.html5-video-player') {
+        return player;
+      }
+      return null;
+    }
+  };
+}
+
 globalThis.window = globalThis;
+globalThis.document = createMockDocument();
 await import('../extension/captionObserver.js');
 
 function createCaptionNode(text) {
@@ -220,7 +290,52 @@ describe('caption observer hardening', () => {
     await vi.advanceTimersByTimeAsync(2);
 
     expect(transformSubtitle).toHaveBeenCalledTimes(1);
-    expect(nestedSegment.textContent).toContain('(ok)');
+    expect(nestedSegment.textContent).toBe('nested line');
+    vi.useRealTimers();
+  });
+
+  it('renders transformed subtitle in overlay instead of mutating caption node', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (overlay)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    const subtitleNode = createCaptionNode('overlay line');
+    handler.handleMutations(mutationForNode(subtitleNode));
+    await vi.advanceTimersByTimeAsync(2);
+
+    const overlay = document.getElementById('immersion-caption-overlay');
+    expect(overlay).not.toBeNull();
+    expect(overlay.innerText).toBe('overlay line (overlay)');
+    expect(subtitleNode.textContent).toBe('overlay line');
+
+    vi.useRealTimers();
+  });
+
+  it('injects overlay style only once', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (styled)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    handler.handleMutations(mutationForNode(createCaptionNode('first')));
+    await vi.advanceTimersByTimeAsync(2);
+    handler.handleMutations(mutationForNode(createCaptionNode('second')));
+    await vi.advanceTimersByTimeAsync(2);
+
+    const styleNodes = document.head.children.filter(
+      (node) => node.id === 'immersion-caption-overlay-style'
+    );
+    expect(styleNodes).toHaveLength(1);
+
     vi.useRealTimers();
   });
 

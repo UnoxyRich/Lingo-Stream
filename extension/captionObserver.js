@@ -1,4 +1,6 @@
 const DEFAULT_DEBOUNCE_MS = 200;
+const OVERLAY_CONTAINER_ID = 'immersion-caption-overlay';
+const OVERLAY_STYLE_ID = 'immersion-caption-overlay-style';
 
 function hashText(text) {
   let hash = 0;
@@ -57,6 +59,79 @@ function createCaptionMutationHandler({
   let isProcessing = false;
   let rerunRequested = false;
   let lastProcessedCaptionHash = null;
+  let lastRenderedOverlayText = '';
+
+  function ensureOverlayStyle() {
+    if (document.getElementById(OVERLAY_STYLE_ID)) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = OVERLAY_STYLE_ID;
+    style.textContent = `
+      .ytp-caption-window-container {
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      #${OVERLAY_CONTAINER_ID} {
+        position: absolute;
+        left: 50%;
+        bottom: 8%;
+        transform: translateX(-50%);
+        width: min(90%, 960px);
+        color: #fff;
+        text-align: center;
+        font-size: clamp(20px, 2.8vw, 34px);
+        line-height: 1.35;
+        text-shadow:
+          -1px -1px 0 #000,
+          1px -1px 0 #000,
+          -1px 1px 0 #000,
+          1px 1px 0 #000,
+          0 0 8px rgba(0, 0, 0, 0.8);
+        z-index: 60;
+        pointer-events: none;
+        font-family: "YouTube Noto", Roboto, Arial, Helvetica, sans-serif;
+        white-space: pre-wrap;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function ensureOverlayNode() {
+    ensureOverlayStyle();
+
+    const existing = document.getElementById(OVERLAY_CONTAINER_ID);
+    if (existing) {
+      return existing;
+    }
+
+    const player = document.querySelector('.html5-video-player') || document.body;
+    if (!player) {
+      return null;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = OVERLAY_CONTAINER_ID;
+    player.appendChild(overlay);
+    return overlay;
+  }
+
+  function renderOverlay(text) {
+    const overlay = ensureOverlayNode();
+    if (!overlay) {
+      return;
+    }
+
+    if (text === lastRenderedOverlayText) {
+      return;
+    }
+
+    overlay.innerText = text;
+    lastRenderedOverlayText = text;
+  }
 
   async function processQueue() {
     if (isProcessing) {
@@ -105,10 +180,9 @@ function createCaptionMutationHandler({
       console.log('Processing subtitle text.', originalText);
       void window.log?.(`Processing subtitle: "${originalText}"`);
       const transformed = await transformSubtitle(originalText, replacementPercentage);
-      if (transformed && transformed !== originalText) {
-        node.textContent = transformed;
-        void window.log?.(`Subtitle updated: "${transformed}"`);
-      }
+      const renderedSubtitle = transformed || originalText;
+      renderOverlay(renderedSubtitle);
+      void window.log?.(`Overlay subtitle updated: "${renderedSubtitle}"`);
 
       lastProcessedByNode.set(node, originalHash);
       lastProcessedCaptionHash = originalHash;
