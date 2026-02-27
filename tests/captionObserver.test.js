@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCaptionMutationHandler } from '../extension/captionObserver.js';
+
+globalThis.window = globalThis;
+await import('../extension/captionObserver.js');
 
 function createCaptionNode(text) {
   return {
@@ -24,7 +26,7 @@ describe('caption observer hardening', () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => text);
-    const handler = createCaptionMutationHandler({
+    const handler = window.createCaptionMutationHandler({
       getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
       transformSubtitle,
       debounceMs: 200
@@ -47,7 +49,7 @@ describe('caption observer hardening', () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => `${text} (x)`);
-    const handler = createCaptionMutationHandler({
+    const handler = window.createCaptionMutationHandler({
       getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
       transformSubtitle,
       debounceMs: 200
@@ -68,7 +70,7 @@ describe('caption observer hardening', () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => `${text} (done)`);
-    const handler = createCaptionMutationHandler({
+    const handler = window.createCaptionMutationHandler({
       getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
       transformSubtitle,
       debounceMs: 200
@@ -86,4 +88,140 @@ describe('caption observer hardening', () => {
 
     vi.useRealTimers();
   });
+
+  it('skips processing when immersion mode is disabled', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (x)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: false, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 200
+    });
+
+    handler.handleMutations(mutationForNode(createCaptionNode('Disabled subtitle')));
+    await vi.advanceTimersByTimeAsync(210);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(0);
+    vi.useRealTimers();
+  });
+
+  it('ignores mutations without caption segments', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => text);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 200
+    });
+
+    handler.handleMutations([{ type: 'attributes', addedNodes: [] }]);
+    await vi.advanceTimersByTimeAsync(210);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(0);
+    vi.useRealTimers();
+  });
+
+
+  it('skips empty subtitle text nodes', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (done)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 200
+    });
+
+    handler.handleMutations(mutationForNode(createCaptionNode('   ')));
+    await vi.advanceTimersByTimeAsync(210);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(0);
+    vi.useRealTimers();
+  });
+
+
+  it('requests a rerun when new mutations arrive during active processing', async () => {
+    vi.useFakeTimers();
+
+    let resolveFirst;
+    const firstPending = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+
+    let callCount = 0;
+    const transformSubtitle = vi.fn(async (text) => {
+      callCount += 1;
+      if (callCount === 1) {
+        return firstPending;
+      }
+
+      return `${text} (rerun)`;
+    });
+
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    handler.handleMutations(mutationForNode(createCaptionNode('first line')));
+    await vi.advanceTimersByTimeAsync(2);
+
+    handler.handleMutations(mutationForNode(createCaptionNode('second line')));
+    await vi.advanceTimersByTimeAsync(2);
+
+    resolveFirst('first line (done)');
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+
+  it('ignores non-element nodes in mutation records', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => text);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    handler.handleMutations([{ type: 'childList', addedNodes: [{ nodeType: 3 }] }]);
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(0);
+    vi.useRealTimers();
+  });
+
+  it('processes nested caption segments discovered by querySelectorAll', async () => {
+    vi.useFakeTimers();
+
+    const nestedSegment = createCaptionNode('nested line');
+    const wrapperNode = {
+      nodeType: 1,
+      textContent: '',
+      matches: () => false,
+      querySelectorAll: () => [nestedSegment]
+    };
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (ok)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    handler.handleMutations([{ type: 'childList', addedNodes: [wrapperNode] }]);
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(1);
+    expect(nestedSegment.textContent).toContain('(ok)');
+    vi.useRealTimers();
+  });
+
 });

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cache, translateWord, translateWords } from '../extension/translation.js';
+
+globalThis.window = globalThis;
+await import('../extension/translation.js');
 
 describe('translation layer', () => {
   beforeEach(() => {
-    Object.keys(cache).forEach((key) => delete cache[key]);
+    Object.keys(window.translationCache).forEach((key) => delete window.translationCache[key]);
 
     global.chrome = {
       storage: {
@@ -30,8 +32,8 @@ describe('translation layer', () => {
       json: async () => [{ translatedText: 'hola' }, { translatedText: 'mundo' }]
     }));
 
-    const first = await translateWords(['Hello', 'World']);
-    const second = await translateWords(['hello']);
+    const first = await window.translateWords(['Hello', 'World']);
+    const second = await window.translateWords(['hello']);
 
     expect(first.hello).toBe('hola');
     expect(first.world).toBe('mundo');
@@ -45,7 +47,7 @@ describe('translation layer', () => {
       .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) });
 
-    const result = await translateWords(['hello']);
+    const result = await window.translateWords(['hello']);
 
     expect(result).toEqual({ hello: 'hola' });
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -68,7 +70,7 @@ describe('translation layer', () => {
       json: async () => ({ translation: 'bonjour' })
     }));
 
-    const result = await translateWord('hello');
+    const result = await window.translateWord('hello');
 
     expect(result).toBe('bonjour');
     expect(global.fetch.mock.calls[0][0]).toContain('https://lingva.ml/api/v1/en/fr/hello');
@@ -81,7 +83,7 @@ describe('translation layer', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'mundo' }) });
 
-    const result = await translateWords(['hello', 'world']);
+    const result = await window.translateWords(['hello', 'world']);
 
     expect(result).toEqual({ hello: 'hola', world: 'mundo' });
     expect(global.fetch).toHaveBeenCalledTimes(3);
@@ -96,7 +98,7 @@ describe('translation layer', () => {
       })
     );
 
-    const result = await translateWord('timeout');
+    const result = await window.translateWord('timeout');
     expect(result).toBeNull();
     expect(console.warn).toHaveBeenCalled();
   });
@@ -104,7 +106,89 @@ describe('translation layer', () => {
   it('returns null for invalid response structure', async () => {
     global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ translated: 'bad' }) }));
 
-    const result = await translateWord('shape');
+    const result = await window.translateWord('shape');
     expect(result).toBeNull();
   });
+
+  it('returns cached value without network calls', async () => {
+    window.translationCache.hello = 'hola';
+    global.fetch = vi.fn();
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({ hello: 'hola' });
+    expect(global.fetch).toHaveBeenCalledTimes(0);
+  });
+
+  it('handles provider defaults when storage is empty', async () => {
+    global.chrome.storage.sync.get = vi.fn((_keys, callback) => callback({}));
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ translatedText: 'hola' }) }));
+
+    const result = await window.translateWord('hello');
+    expect(result).toBe('hola');
+    expect(global.fetch.mock.calls[0][0]).toBe('https://translate.cutie.dating/translate');
+  });
+
+  it('falls back to single-word loop when batch throws non-timeout error', async () => {
+    global.fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ translatedText: 'hola' }) });
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({ hello: 'hola' });
+  });
+
+
+  it('returns empty result when fallback provider times out', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+      .mockRejectedValueOnce(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({});
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('handles non-timeout errors during single-word fallback loop', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('hard failure'));
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({});
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+
+  it('logs libre rate limit branch and falls back successfully', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) });
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({ hello: 'hola' });
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('logs lingva rate limit branch and falls back to libre', async () => {
+    global.chrome.storage.sync.get = vi.fn((_keys, callback) => {
+      callback({
+        translationProvider: 'lingva',
+        targetLanguage: 'es',
+        sourceLanguage: 'en',
+        translationEndpoint: 'https://lingva.ml/api/v1',
+        translationTimeoutMs: 20
+      });
+    });
+
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ translatedText: 'hola' }) });
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({ hello: 'hola' });
+    expect(console.warn).toHaveBeenCalled();
+  });
+
 });
