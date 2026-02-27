@@ -22,10 +22,24 @@ describe('percentage replacement logic', () => {
     vi.restoreAllMocks();
   });
 
-  it('builds subtitle with translated suffix format', async () => {
+  it('builds subtitle with translated suffix format from batched translations', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const translateMock = vi.fn(async (word) => `${word}-es`);
-    const output = await buildImmersiveSubtitle('I enjoy learning skills daily', translateMock, 50);
+    const translateWordsMock = vi.fn(async (words) => {
+      const output = {};
+      for (const word of words) {
+        output[word.toLowerCase()] = `${word}-es`;
+      }
+
+      return output;
+    });
+
+    const output = await buildImmersiveSubtitle(
+      'I enjoy learning skills daily',
+      translateWordsMock,
+      50
+    );
+
+    expect(translateWordsMock).toHaveBeenCalledTimes(1);
     expect(output).toContain('enjoy (enjoy-es)');
     vi.restoreAllMocks();
   });

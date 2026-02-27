@@ -6,7 +6,8 @@ const requiredFiles = [
   'extension/popup.html',
   'extension/stopwords.js',
   'extension/processor.js',
-  'extension/translation.js'
+  'extension/translation.js',
+  'extension/captionObserver.js'
 ];
 
 for (const file of requiredFiles) {

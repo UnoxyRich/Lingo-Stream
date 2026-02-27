@@ -26,7 +26,7 @@ export function pickUniqueWordInfos(candidates, replacementPercentage = 5) {
   return chosen;
 }
 
-export async function buildImmersiveSubtitle(text, translateWord, replacementPercentage = 5) {
+export async function buildImmersiveSubtitle(text, translateWords, replacementPercentage = 5) {
   const tokens = text.split(/(\s+)/);
   const wordOnlyTokens = tokens.filter((token) => token.trim().length > 0);
   const candidateWordInfos = getUniqueTranslatableWordInfos(wordOnlyTokens);
@@ -36,19 +36,8 @@ export async function buildImmersiveSubtitle(text, translateWord, replacementPer
     return text;
   }
 
-  const translatedByNormalized = new Map();
-
-  await Promise.all(
-    selected.map(async ({ token }) => {
-      const normalized = token.toLowerCase();
-      if (!translatedByNormalized.has(normalized)) {
-        const translated = await translateWord(token);
-        if (translated && translated.trim()) {
-          translatedByNormalized.set(normalized, translated.trim());
-        }
-      }
-    })
-  );
+  const selectedWords = selected.map(({ token }) => token);
+  const translatedByNormalized = await translateWords(selectedWords);
 
   return tokens
     .map((token) => {
@@ -58,7 +47,7 @@ export async function buildImmersiveSubtitle(text, translateWord, replacementPer
       }
 
       const normalized = trimmed.toLowerCase();
-      const translated = translatedByNormalized.get(normalized);
+      const translated = translatedByNormalized[normalized];
       if (!translated) {
         return token;
       }

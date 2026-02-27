@@ -9,7 +9,11 @@ export default [
         MutationObserver: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
-        HTMLElement: 'readonly'
+        HTMLElement: 'readonly',
+        AbortController: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        console: 'readonly'
       }
     },
     rules: {

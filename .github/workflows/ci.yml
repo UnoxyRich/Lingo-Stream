@@ -26,8 +26,8 @@ jobs:
       - name: Validate manifest
         run: npm run validate:manifest
 
-      - name: Run unit tests
-        run: npm test
+      - name: Run unit tests with coverage threshold
+        run: npm run test:coverage
 
       - name: Ensure extension build check passes
         run: npm run build
