@@ -54,6 +54,12 @@ function createMockDocument() {
     head,
     body,
     player,
+    querySelectorAll(selector) {
+      if (selector === '.ytp-caption-segment') {
+        return [];
+      }
+      return [];
+    },
     createElement(tagName) {
       return createMockElement(tagName);
     },
@@ -335,6 +341,53 @@ describe('caption observer hardening', () => {
       (node) => node.id === 'immersion-caption-overlay-style'
     );
     expect(styleNodes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it('processes characterData mutations inside caption segments', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (characterData)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    const subtitleNode = createCaptionNode('char data line');
+    const textNode = {
+      nodeType: 3,
+      parentElement: subtitleNode
+    };
+
+    handler.handleMutations([{ type: 'characterData', target: textNode }]);
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(1);
+    expect(transformSubtitle).toHaveBeenCalledWith('char data line', 5);
+
+    vi.useRealTimers();
+  });
+
+  it('primes processing from existing caption segments', async () => {
+    vi.useFakeTimers();
+
+    const existingCaption = createCaptionNode('existing subtitle');
+    document.querySelectorAll = (selector) => (selector === '.ytp-caption-segment' ? [existingCaption] : []);
+
+    const transformSubtitle = vi.fn(async (text) => `${text} (primed)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    handler.primeFromCurrentCaptions();
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(1);
+    expect(transformSubtitle).toHaveBeenCalledWith('existing subtitle', 5);
 
     vi.useRealTimers();
   });
