@@ -274,6 +274,27 @@ describe('caption observer hardening', () => {
     vi.useRealTimers();
   });
 
+
+  it('processes childList mutations when the caption segment is the mutation target', async () => {
+    vi.useFakeTimers();
+
+    const transformSubtitle = vi.fn(async (line) => `${line} (target)`);
+    const handler = window.createCaptionMutationHandler({
+      getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
+      transformSubtitle,
+      debounceMs: 1
+    });
+
+    const subtitleNode = createCaptionNode('target line');
+    handler.handleMutations([{ type: 'childList', target: subtitleNode, addedNodes: [] }]);
+    await vi.advanceTimersByTimeAsync(2);
+
+    expect(transformSubtitle).toHaveBeenCalledTimes(1);
+    expect(transformSubtitle).toHaveBeenCalledWith('target line', 5);
+
+    vi.useRealTimers();
+  });
+
   it('processes nested caption segments discovered by querySelectorAll', async () => {
     vi.useFakeTimers();
 
