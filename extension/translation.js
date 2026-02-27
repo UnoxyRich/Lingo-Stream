@@ -1,3 +1,5 @@
+import { log } from './logger.js';
+
 export const cache = {};
 
 const DEFAULT_TIMEOUT_MS = 3000;
@@ -85,6 +87,7 @@ async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
 }
 
 async function requestLibreTranslations(words, settings) {
+  void log(`Translation API called (libre): ${JSON.stringify(words)}`);
   const response = await fetchWithTimeout(
     settings.translationEndpoint,
     {
@@ -102,16 +105,20 @@ async function requestLibreTranslations(words, settings) {
       console.warn('LibreTranslate rate limit reached.');
     }
 
+    void log(`Translation API failed (libre): status=${response.status}`);
     return null;
   }
 
   const payload = await response.json();
-  return normalizeLibreTranslations(words, payload);
+  const normalized = normalizeLibreTranslations(words, payload);
+  void log(`Translation API response valid (libre): ${Boolean(normalized)}`);
+  return normalized;
 }
 
 async function requestLingvaTranslation(word, settings) {
   const url = `${settings.translationEndpoint}/${encodeURIComponent(settings.sourceLanguage)}/${encodeURIComponent(settings.targetLanguage)}/${encodeURIComponent(word)}`;
 
+  void log(`Translation API called (lingva): ${word}`);
   const response = await fetchWithTimeout(
     url,
     {
@@ -125,11 +132,14 @@ async function requestLingvaTranslation(word, settings) {
       console.warn('Lingva rate limit reached.');
     }
 
+    void log(`Translation API failed (lingva): status=${response.status}`);
     return null;
   }
 
   const payload = await response.json();
-  return normalizeLingvaTranslations([word], payload);
+  const normalized = normalizeLingvaTranslations([word], payload);
+  void log(`Translation API response valid (lingva): ${Boolean(normalized)}`);
+  return normalized;
 }
 
 function toUniqueWords(words) {
@@ -223,6 +233,7 @@ export async function translateWords(words) {
     const normalized = word.toLowerCase();
     if (cache[normalized]) {
       translations[normalized] = cache[normalized];
+      void log(`Cache hit: ${word}`);
     } else {
       misses.push(word);
     }
@@ -233,6 +244,7 @@ export async function translateWords(words) {
   }
 
   const settings = await getTranslationSettings();
+  void log(`Batch request sent: ${JSON.stringify(misses)}`);
 
   try {
     const batched = await requestWithFallback(misses, settings);
@@ -242,13 +254,16 @@ export async function translateWords(words) {
         translations[normalized] = translated;
       }
 
+      void log('Batch translation request succeeded');
       return translations;
     }
   } catch (error) {
     if (error?.name === 'AbortError') {
       console.warn('Translation request timed out.');
+      void log('Translation API failed: batch request timed out');
     } else {
       console.warn('Batch translation failed. Falling back to single requests.');
+      void log('Translation API failed: batch request error, falling back to single requests');
     }
   }
 
@@ -261,13 +276,16 @@ export async function translateWords(words) {
         if (translated) {
           cache[normalized] = translated;
           translations[normalized] = translated;
+          void log(`Translation success: ${word} -> ${translated}`);
         }
       }
     } catch (error) {
       if (error?.name === 'AbortError') {
         console.warn(`Translation timed out for word: ${word}`);
+        void log(`Translation API failed: timeout for ${word}`);
       } else {
         console.warn(`Translation failed for word: ${word}`);
+        void log(`Translation API failed: single request error for ${word}`);
       }
     }
   }

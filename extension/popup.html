@@ -69,6 +69,34 @@
         font-size: 12px;
         opacity: 0.8;
       }
+
+      .debug-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+      }
+
+      #clearLogsButton {
+        margin-top: 8px;
+      }
+
+      #logPanel {
+        margin-top: 8px;
+        border: 1px solid #888;
+        border-radius: 4px;
+        padding: 8px;
+        height: 140px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        background: rgba(127, 127, 127, 0.08);
+      }
+
+      #logPanel.hidden {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -112,6 +140,14 @@
 
       <button id="saveButton" type="button">Save</button>
       <p id="saveStatus" role="status" aria-live="polite"></p>
+
+      <div class="debug-controls">
+        <label for="debugEnabled">Enable Debug Mode</label>
+        <input id="debugEnabled" name="debugEnabled" type="checkbox" />
+      </div>
+
+      <button id="clearLogsButton" type="button">Clear Logs</button>
+      <div id="logPanel" class="hidden" aria-live="polite">Live logs appear here.</div>
     </main>
 
     <script src="popup.js"></script>

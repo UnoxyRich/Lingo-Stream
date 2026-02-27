@@ -1,10 +1,12 @@
 import { createCaptionMutationHandler } from './captionObserver.js';
+import { log } from './logger.js';
 import { buildImmersiveSubtitle } from './processor.js';
 import { translateWords } from './translation.js';
 
 const DEFAULT_REPLACEMENT_PERCENTAGE = 5;
 
 console.log('YouTube Immersion Mode loaded');
+void log('content.js loaded');
 
 function getSettings() {
   return new Promise((resolve) => {
@@ -24,6 +26,7 @@ function getSettings() {
       };
 
       console.log('Content settings loaded.', resolved);
+      void log(`Content settings loaded: enabled=${resolved.enabled}, replacement=${resolved.replacementPercentage}`);
       resolve(resolved);
     });
   });
@@ -55,7 +58,12 @@ if (document.body) {
         subtree: true
       });
       console.log('YouTube Immersion Mode observer attached after DOMContentLoaded');
+      void log('MutationObserver attached after DOMContentLoaded');
     },
     { once: true }
   );
+}
+
+if (document.body) {
+  void log('MutationObserver attached to document.body');
 }

@@ -1,4 +1,5 @@
 import { getUniqueTranslatableWordInfos } from './stopwords.js';
+import { log } from './logger.js';
 
 export function calculateReplacementCount(totalCandidates, replacementPercentage = 5) {
   if (totalCandidates <= 0 || replacementPercentage <= 0) {
@@ -27,16 +28,28 @@ export function pickUniqueWordInfos(candidates, replacementPercentage = 5) {
 }
 
 export async function buildImmersiveSubtitle(text, translateWords, replacementPercentage = 5) {
+  if (!text || !text.trim()) {
+    void log('Skipped processing: no subtitles');
+    return text;
+  }
+
+  if (!Number.isFinite(replacementPercentage) || replacementPercentage <= 0) {
+    void log('Skipped processing: empty settings (replacement percentage <= 0)');
+    return text;
+  }
+
   const tokens = text.split(/(\s+)/);
   const wordOnlyTokens = tokens.filter((token) => token.trim().length > 0);
   const candidateWordInfos = getUniqueTranslatableWordInfos(wordOnlyTokens);
   const selected = pickUniqueWordInfos(candidateWordInfos, replacementPercentage);
 
   if (selected.length === 0) {
+    void log('Skipped processing: no eligible words selected');
     return text;
   }
 
   const selectedWords = selected.map(({ token }) => token);
+  void log(`Words selected: ${JSON.stringify(selectedWords)}`);
   const translatedByNormalized = await translateWords(selectedWords);
 
   return tokens
