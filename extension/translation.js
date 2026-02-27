@@ -143,6 +143,10 @@ export async function translateWords(words) {
 
   const settings = await getTranslationSettings();
 
+  if (!settings.apiKey) {
+    console.warn('No API key configured. Translation requests may be rejected by the provider.');
+  }
+
   try {
     const batched = await requestTranslations(misses, settings);
     if (batched) {

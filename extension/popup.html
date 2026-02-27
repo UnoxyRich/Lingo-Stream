@@ -4,11 +4,106 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>YouTube Immersion Mode</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        min-width: 320px;
+      }
+
+      main {
+        padding: 12px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 16px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .field-inline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      label {
+        font-size: 13px;
+      }
+
+      input,
+      select,
+      button {
+        font-size: 13px;
+      }
+
+      .range-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      #replacementPercentage {
+        flex: 1;
+      }
+
+      #saveStatus {
+        min-height: 18px;
+        margin-top: 8px;
+        font-size: 12px;
+      }
+    </style>
   </head>
   <body>
     <main>
       <h1>YouTube Immersion Mode</h1>
-      <p>Configure settings in upcoming iterations.</p>
+
+      <div class="field">
+        <label for="apiKey">LibreTranslate API Key</label>
+        <input id="apiKey" name="apiKey" type="password" placeholder="Enter API key" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label for="targetLanguage">Target language</label>
+        <select id="targetLanguage" name="targetLanguage">
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ja">Japanese</option>
+          <option value="ko">Korean</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="replacementPercentage">Replacement percentage</label>
+        <div class="range-row">
+          <input id="replacementPercentage" name="replacementPercentage" type="range" min="1" max="100" step="1" />
+          <output id="replacementPercentageValue" for="replacementPercentage">5%</output>
+        </div>
+      </div>
+
+      <div class="field-inline">
+        <label for="enabled">Enable immersion mode</label>
+        <input id="enabled" name="enabled" type="checkbox" />
+      </div>
+
+      <button id="saveButton" type="button">Save</button>
+      <p id="saveStatus" role="status" aria-live="polite"></p>
     </main>
+
+    <script src="popup.js"></script>
   </body>
 </html>

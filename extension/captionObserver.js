@@ -68,6 +68,7 @@ export function createCaptionMutationHandler({
     const { enabled, replacementPercentage } = await getSettings();
 
     if (!enabled) {
+      console.log('Immersion mode disabled. Skipping caption processing.');
       pendingSegments.clear();
       isProcessing = false;
       return;
@@ -82,6 +83,8 @@ export function createCaptionMutationHandler({
         continue;
       }
 
+      console.log('Caption detected.', originalText);
+
       const originalHash = hashText(originalText);
       if (lastProcessedByNode.get(node) === originalHash) {
         continue;
@@ -92,6 +95,7 @@ export function createCaptionMutationHandler({
         continue;
       }
 
+      console.log('Processing subtitle text.', originalText);
       const transformed = await transformSubtitle(originalText, replacementPercentage);
       if (transformed && transformed !== originalText) {
         node.textContent = transformed;
@@ -125,6 +129,8 @@ export function createCaptionMutationHandler({
     if (segments.size === 0) {
       return;
     }
+
+    console.log(`Caption observer found ${segments.size} segment(s).`);
 
     for (const segment of segments) {
       pendingSegments.add(segment);
