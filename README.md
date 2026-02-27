@@ -17,7 +17,7 @@ Immersion Mode (Spanish 5%):
 - Detects YouTube auto-generated subtitles
 - Replaces ~5% of meaningful words
 - Filters out stop words (is, are, a, the, etc.)
-- User inputs their own translation API key
+- Uses free public translation endpoints (no API key required)
 - User selects target language
 - Adjustable replacement percentage
 - Real-time subtitle modification using MutationObserver
@@ -55,12 +55,12 @@ Files:
 
 ## 🔑 API
 
-User must provide:
-- Their own translation API key
-- Target language code (e.g. es, fr, de, ja)
+This extension uses free public translation providers and does not require API keys, billing, or self-hosting.
 
-Recommended free option:
-- LibreTranslate (public instance)
+- LibreTranslate public mirror: `https://translate.cutie.dating/translate`
+- Lingva Translate proxy: `https://lingva.ml/api/v1/{source}/{target}/{text}`
+
+Users can choose their provider in the popup and the extension falls back to the other provider if the selected one is unavailable.
 
 ---
 

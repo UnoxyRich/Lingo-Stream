@@ -1,6 +1,14 @@
 export const cache = {};
 
 const DEFAULT_TIMEOUT_MS = 3000;
+const FREE_TRANSLATION_PROVIDERS = {
+  libre: {
+    endpoint: 'https://translate.cutie.dating/translate'
+  },
+  lingva: {
+    endpoint: 'https://lingva.ml/api/v1'
+  }
+};
 
 function getFromStorage(keys) {
   return new Promise((resolve) => {
@@ -8,17 +16,16 @@ function getFromStorage(keys) {
   });
 }
 
-function buildRequestBody(q, settings) {
+function buildLibreRequestBody(q, settings) {
   return {
     q,
     source: settings.sourceLanguage,
     target: settings.targetLanguage,
-    format: 'text',
-    api_key: settings.apiKey
+    format: 'text'
   };
 }
 
-function normalizeTranslations(words, payload) {
+function normalizeLibreTranslations(words, payload) {
   if (Array.isArray(payload)) {
     if (payload.length !== words.length) {
       return null;
@@ -47,6 +54,20 @@ function normalizeTranslations(words, payload) {
   return null;
 }
 
+function normalizeLingvaTranslations(words, payload) {
+  if (words.length !== 1) {
+    return null;
+  }
+
+  if (typeof payload?.translation !== 'string' || !payload.translation.trim()) {
+    return null;
+  }
+
+  return {
+    [words[0].toLowerCase()]: payload.translation.trim()
+  };
+}
+
 async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -63,7 +84,7 @@ async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
-async function requestTranslations(words, settings) {
+async function requestLibreTranslations(words, settings) {
   const response = await fetchWithTimeout(
     settings.translationEndpoint,
     {
@@ -71,23 +92,44 @@ async function requestTranslations(words, settings) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(buildRequestBody(words.length === 1 ? words[0] : words, settings))
+      body: JSON.stringify(buildLibreRequestBody(words.length === 1 ? words[0] : words, settings))
     },
     settings.translationTimeoutMs
   );
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      console.warn('Translation request rejected. Check API key.');
-    } else if (response.status === 429) {
-      console.warn('Translation API rate limit reached.');
+    if (response.status === 429) {
+      console.warn('LibreTranslate rate limit reached.');
     }
 
     return null;
   }
 
   const payload = await response.json();
-  return normalizeTranslations(words, payload);
+  return normalizeLibreTranslations(words, payload);
+}
+
+async function requestLingvaTranslation(word, settings) {
+  const url = `${settings.translationEndpoint}/${encodeURIComponent(settings.sourceLanguage)}/${encodeURIComponent(settings.targetLanguage)}/${encodeURIComponent(word)}`;
+
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: 'GET'
+    },
+    settings.translationTimeoutMs
+  );
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      console.warn('Lingva rate limit reached.');
+    }
+
+    return null;
+  }
+
+  const payload = await response.json();
+  return normalizeLingvaTranslations([word], payload);
 }
 
 function toUniqueWords(words) {
@@ -107,20 +149,69 @@ function toUniqueWords(words) {
 
 async function getTranslationSettings() {
   const settings = await getFromStorage([
-    'apiKey',
+    'translationProvider',
     'targetLanguage',
     'sourceLanguage',
     'translationEndpoint',
     'translationTimeoutMs'
   ]);
 
+  const provider = settings.translationProvider ?? 'libre';
+  const defaultEndpoint = FREE_TRANSLATION_PROVIDERS[provider]?.endpoint ?? FREE_TRANSLATION_PROVIDERS.libre.endpoint;
+
   return {
-    apiKey: settings.apiKey ?? '',
+    translationProvider: provider,
     targetLanguage: settings.targetLanguage ?? 'es',
     sourceLanguage: settings.sourceLanguage ?? 'en',
-    translationEndpoint: settings.translationEndpoint ?? 'https://libretranslate.com/translate',
+    translationEndpoint: settings.translationEndpoint ?? defaultEndpoint,
     translationTimeoutMs: settings.translationTimeoutMs ?? DEFAULT_TIMEOUT_MS
   };
+}
+
+async function requestFromSelectedProvider(words, settings) {
+  if (settings.translationProvider === 'lingva') {
+    const translations = {};
+    for (const word of words) {
+      const single = await requestLingvaTranslation(word, settings);
+      if (!single) {
+        return null;
+      }
+
+      translations[word.toLowerCase()] = single[word.toLowerCase()];
+    }
+
+    return translations;
+  }
+
+  return requestLibreTranslations(words, settings);
+}
+
+async function requestWithFallback(words, settings) {
+  const selected = await requestFromSelectedProvider(words, settings);
+  if (selected) {
+    return selected;
+  }
+
+  const fallbackProvider = settings.translationProvider === 'lingva' ? 'libre' : 'lingva';
+  const fallbackSettings = {
+    ...settings,
+    translationProvider: fallbackProvider,
+    translationEndpoint: FREE_TRANSLATION_PROVIDERS[fallbackProvider].endpoint
+  };
+
+  try {
+    const fallback = await requestFromSelectedProvider(words, fallbackSettings);
+    if (fallback) {
+      console.warn(`Primary translation provider failed. Switched to ${fallbackProvider}.`);
+      return fallback;
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      console.warn('Fallback translation request timed out.');
+    }
+  }
+
+  return null;
 }
 
 export async function translateWords(words) {
@@ -143,12 +234,8 @@ export async function translateWords(words) {
 
   const settings = await getTranslationSettings();
 
-  if (!settings.apiKey) {
-    console.warn('No API key configured. Translation requests may be rejected by the provider.');
-  }
-
   try {
-    const batched = await requestTranslations(misses, settings);
+    const batched = await requestWithFallback(misses, settings);
     if (batched) {
       for (const [normalized, translated] of Object.entries(batched)) {
         cache[normalized] = translated;
@@ -167,7 +254,7 @@ export async function translateWords(words) {
 
   for (const word of misses) {
     try {
-      const single = await requestTranslations([word], settings);
+      const single = await requestWithFallback([word], settings);
       if (single) {
         const normalized = word.toLowerCase();
         const translated = single[normalized];

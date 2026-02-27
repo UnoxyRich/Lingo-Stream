@@ -10,10 +10,10 @@ describe('translation layer', () => {
         sync: {
           get: vi.fn((_keys, callback) => {
             callback({
-              apiKey: 'test-key',
+              translationProvider: 'libre',
               targetLanguage: 'es',
               sourceLanguage: 'en',
-              translationEndpoint: 'https://example.test/translate',
+              translationEndpoint: 'https://translate.cutie.dating/translate',
               translationTimeoutMs: 20
             });
           })
@@ -24,13 +24,10 @@ describe('translation layer', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  it('uses batch fetch and caches translation results', async () => {
+  it('uses batch fetch and caches translation results for libre provider', async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,
-      json: async () => [
-        { translatedText: 'hola' },
-        { translatedText: 'mundo' }
-      ]
+      json: async () => [{ translatedText: 'hola' }, { translatedText: 'mundo' }]
     }));
 
     const first = await translateWords(['Hello', 'World']);
@@ -42,21 +39,47 @@ describe('translation layer', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to single requests when batch response is invalid', async () => {
+  it('falls back to lingva when libre endpoint is unavailable', async () => {
     global.fetch = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ invalid: true })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ translatedText: 'hola' })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ translatedText: 'mundo' })
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) });
+
+    const result = await translateWords(['hello']);
+
+    expect(result).toEqual({ hello: 'hola' });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[1][0]).toContain('https://lingva.ml/api/v1/en/es/hello');
+  });
+
+  it('uses lingva provider directly when selected', async () => {
+    global.chrome.storage.sync.get = vi.fn((_keys, callback) => {
+      callback({
+        translationProvider: 'lingva',
+        targetLanguage: 'fr',
+        sourceLanguage: 'en',
+        translationEndpoint: 'https://lingva.ml/api/v1',
+        translationTimeoutMs: 20
       });
+    });
+
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ translation: 'bonjour' })
+    }));
+
+    const result = await translateWord('hello');
+
+    expect(result).toBe('bonjour');
+    expect(global.fetch.mock.calls[0][0]).toContain('https://lingva.ml/api/v1/en/fr/hello');
+  });
+
+  it('falls back to the alternate provider when batch response is invalid', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ invalid: true }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'mundo' }) });
 
     const result = await translateWords(['hello', 'world']);
 
@@ -64,27 +87,14 @@ describe('translation layer', () => {
     expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
-  it('handles invalid api key and rate limits gracefully', async () => {
-    global.fetch = vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) }));
-
-    const keyResult = await translateWord('world');
-
-    global.fetch = vi.fn(async () => ({ ok: false, status: 429, json: async () => ({}) }));
-    const rateResult = await translateWord('again');
-
-    expect(keyResult).toBeNull();
-    expect(rateResult).toBeNull();
-    expect(console.warn).toHaveBeenCalled();
-  });
-
   it('handles timeout simulation', async () => {
-    global.fetch = vi.fn((_url, options) => {
-      return new Promise((_, reject) => {
+    global.fetch = vi.fn((_url, options) =>
+      new Promise((_, reject) => {
         options.signal.addEventListener('abort', () => {
           reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
         });
-      });
-    });
+      })
+    );
 
     const result = await translateWord('timeout');
     expect(result).toBeNull();

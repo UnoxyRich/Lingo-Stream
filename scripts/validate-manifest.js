@@ -28,14 +28,16 @@ if (!hasYouTubeContentScript) {
 
 const hostPermissions = manifest.host_permissions || [];
 const hasYouTubeHost = hostPermissions.includes('https://www.youtube.com/*');
-const hasTranslationHost = hostPermissions.some((host) => host.includes('libretranslate'));
+const hasFreeTranslationHost = hostPermissions.some(
+  (host) => host.includes('translate.cutie.dating') || host.includes('lingva.ml')
+);
 
 if (!hasYouTubeHost) {
   throw new Error('host_permissions must include https://www.youtube.com/*');
 }
 
-if (!hasTranslationHost) {
-  throw new Error('host_permissions must include a LibreTranslate-compatible endpoint host');
+if (!hasFreeTranslationHost) {
+  throw new Error('host_permissions must include at least one free translation endpoint host');
 }
 
 if (!manifest.action?.default_popup) {

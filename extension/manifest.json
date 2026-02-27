@@ -6,7 +6,8 @@
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://libretranslate.com/*"
+    "https://translate.cutie.dating/*",
+    "https://lingva.ml/*"
   ],
   "action": {
     "default_popup": "popup.html"
