@@ -1,61 +1,88 @@
-# YouTube Subtitle Mixer Extension
+# 🎧 YouTube Immersion Mode
 
-A Manifest v3 Chrome extension that runs on YouTube watch pages and randomly swaps about 8–16% of subtitle words with translated words in your selected target language.
+A Chrome extension that helps users learn a foreign language by replacing a small percentage of YouTube subtitles with translated words.
 
-## Features
+Example:
 
-- Works only on `https://www.youtube.com/watch*` pages.
-- Detects subtitle updates in real time using `MutationObserver`.
-- Randomly replaces a small subset of subtitle words.
-- Popup UI to choose a target language.
-- Persists language preference via Chrome storage (`chrome.storage.sync`).
-- Uses a background service worker for translation requests (avoids CORS issues from content scripts).
-- Uses provider fallback:
-  - Primary: LibreTranslate public API.
-  - Secondary fallback: MyMemory API.
-  - Tertiary fallback: Google Translate endpoint.
-- Includes request throttling, batching, and local cache to reduce API calls.
-- Rejects invalid API error payloads so provider error messages are never written into subtitles.
+Original:
+"I really enjoy learning new skills every day."
 
-## Install as an Unpacked Extension
-
-1. Download or clone this repository.
-2. Open Chrome and go to `chrome://extensions`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked**.
-5. Select this project folder.
-6. Open any YouTube video page with subtitles enabled.
-
-## Change the Target Language
-
-1. Click the extension icon in Chrome.
-2. In the popup, choose a language from the dropdown.
-3. The new language is saved automatically.
-4. Return to the YouTube tab; new subtitle updates use the selected language.
-
-## Translation APIs
-
-This extension calls the following free public services from the extension service worker:
-
-- `https://libretranslate.de/translate`
-- `https://api.mymemory.translated.net/get`
-- `https://translate.googleapis.com/translate_a/single`
-
-If LibreTranslate fails, the extension falls back to MyMemory, then Google Translate.
-
-## Reliability Notes
-
-Because this uses public free instances:
-
-- You may occasionally see slow responses.
-- You may hit temporary rate limits if traffic is high.
-
-The extension reduces request volume using:
-
-- basic request interval throttling,
-- batching multiple words per request,
-- in-memory cache of previously translated words.
+Immersion Mode (Spanish 5%):
+"I really enjoy learning new skills (habilidades) every day."
 
 ---
 
-This project is for educational and personal-use experimentation.
+## 🚀 Features (MVP)
+
+- Detects YouTube auto-generated subtitles
+- Replaces ~5% of meaningful words
+- Filters out stop words (is, are, a, the, etc.)
+- User inputs their own translation API key
+- User selects target language
+- Adjustable replacement percentage
+- Real-time subtitle modification using MutationObserver
+
+---
+
+## 🏗 Architecture
+
+Chrome Extension (Manifest V3)
+
+Files:
+
+/extension
+- manifest.json
+- content.js
+- popup.html
+- popup.js
+- stopwords.js
+
+---
+
+## 🧠 How It Works
+
+1. The extension observes YouTube's subtitle DOM elements:
+   `.ytp-caption-segment`
+
+2. When new subtitles appear:
+   - Text is split into words
+   - Stop words are filtered out
+   - A percentage of remaining words are selected
+   - Words are translated via API
+   - Modified text is re-rendered
+
+---
+
+## 🔑 API
+
+User must provide:
+- Their own translation API key
+- Target language code (e.g. es, fr, de, ja)
+
+Recommended free option:
+- LibreTranslate (public instance)
+
+---
+
+## ⚠️ Known Limitations
+
+- API calls are not yet cached
+- May translate the same word multiple times
+- No grammar awareness
+- No vocabulary tracking
+- No batching of translation requests
+- No rate limiting handling
+
+---
+
+## 🛠 Future Improvements
+
+- Add translation caching
+- Add hover tooltip instead of inline replacement
+- Batch API requests
+- Word frequency tracking
+- Difficulty levels (A1–C2)
+- Vocabulary saving
+- Dashboard page
+- Performance optimization
+- Dark mode UI
