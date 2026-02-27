@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildImmersiveSubtitle, calculateReplacementCount, pickUniqueWordInfos } from '../extension/processor.js';
+
+globalThis.window = globalThis;
+await import('../extension/stopwords.js');
+await import('../extension/processor.js');
 
 describe('percentage replacement logic', () => {
   it('calculates replacement count safely', () => {
-    expect(calculateReplacementCount(0, 5)).toBe(0);
-    expect(calculateReplacementCount(2, 5)).toBe(1);
-    expect(calculateReplacementCount(10, 20)).toBe(2);
+    expect(window.calculateReplacementCount(0, 5)).toBe(0);
+    expect(window.calculateReplacementCount(2, 5)).toBe(1);
+    expect(window.calculateReplacementCount(10, 20)).toBe(2);
   });
 
   it('picks unique words based on percentage', () => {
@@ -16,10 +19,22 @@ describe('percentage replacement logic', () => {
     ];
 
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const selected = pickUniqueWordInfos(candidates, 66);
+    const selected = window.pickUniqueWordInfos(candidates, 66);
     expect(selected.length).toBe(1);
     expect(selected[0].token).toBe('learning');
     vi.restoreAllMocks();
+  });
+
+
+
+  it('returns original text when subtitle is empty', async () => {
+    const output = await window.buildImmersiveSubtitle('   ', async () => ({}), 50);
+    expect(output).toBe('   ');
+  });
+
+  it('returns original text when replacement percentage is invalid', async () => {
+    const output = await window.buildImmersiveSubtitle('hello world', async () => ({}), 0);
+    expect(output).toBe('hello world');
   });
 
   it('builds subtitle with translated suffix format from batched translations', async () => {
@@ -33,7 +48,7 @@ describe('percentage replacement logic', () => {
       return output;
     });
 
-    const output = await buildImmersiveSubtitle(
+    const output = await window.buildImmersiveSubtitle(
       'I enjoy learning skills daily',
       translateWordsMock,
       50

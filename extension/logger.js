@@ -37,7 +37,7 @@ function formatTimestamp(date = new Date()) {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
-export async function log(message) {
+async function log(message) {
   if (!hasStorageApi()) {
     return;
   }
@@ -52,3 +52,4 @@ export async function log(message) {
   await setLocalStorage({ [LOGS_KEY]: nextLogs });
 }
 
+window.log = log;

@@ -1,8 +1,6 @@
-import { log } from './logger.js';
-
 const DEFAULT_DEBOUNCE_MS = 200;
 
-export function hashText(text) {
+function hashText(text) {
   let hash = 0;
   for (let index = 0; index < text.length; index += 1) {
     hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
@@ -48,7 +46,7 @@ function collectCaptionSegments(mutations) {
   return segments;
 }
 
-export function createCaptionMutationHandler({
+function createCaptionMutationHandler({
   getSettings,
   transformSubtitle,
   debounceMs = DEFAULT_DEBOUNCE_MS
@@ -63,17 +61,17 @@ export function createCaptionMutationHandler({
   async function processQueue() {
     if (isProcessing) {
       rerunRequested = true;
-      void log('Processing already running; rerun requested');
+      void window.log?.('Processing already running; rerun requested');
       return;
     }
 
     isProcessing = true;
-    void log('Subtitle processing started');
+    void window.log?.('Subtitle processing started');
     const { enabled, replacementPercentage } = await getSettings();
 
     if (!enabled) {
       console.log('Immersion mode disabled. Skipping caption processing.');
-      void log('Skipped processing: immersion mode disabled');
+      void window.log?.('Skipped processing: immersion mode disabled');
       pendingSegments.clear();
       isProcessing = false;
       return;
@@ -85,31 +83,31 @@ export function createCaptionMutationHandler({
     for (const node of batch) {
       const originalText = node.textContent?.trim();
       if (!originalText) {
-        void log('Skipped processing: no subtitles/empty subtitle text');
+        void window.log?.('Skipped processing: no subtitles/empty subtitle text');
         continue;
       }
 
       console.log('Caption detected.', originalText);
-      void log(`Subtitle node detected: "${originalText}"`);
+      void window.log?.(`Subtitle node detected: "${originalText}"`);
 
       const originalHash = hashText(originalText);
       if (lastProcessedByNode.get(node) === originalHash) {
-        void log('Skipped processing: already processed subtitle node');
+        void window.log?.('Skipped processing: already processed subtitle node');
         continue;
       }
 
       if (lastProcessedCaptionHash === originalHash) {
         lastProcessedByNode.set(node, originalHash);
-        void log('Skipped processing: duplicate subtitle hash');
+        void window.log?.('Skipped processing: duplicate subtitle hash');
         continue;
       }
 
       console.log('Processing subtitle text.', originalText);
-      void log(`Processing subtitle: "${originalText}"`);
+      void window.log?.(`Processing subtitle: "${originalText}"`);
       const transformed = await transformSubtitle(originalText, replacementPercentage);
       if (transformed && transformed !== originalText) {
         node.textContent = transformed;
-        void log(`Subtitle updated: "${transformed}"`);
+        void window.log?.(`Subtitle updated: "${transformed}"`);
       }
 
       lastProcessedByNode.set(node, originalHash);
@@ -129,7 +127,7 @@ export function createCaptionMutationHandler({
       clearTimeout(timer);
     }
 
-    void log(`Debounce triggered (${debounceMs}ms)`);
+    void window.log?.(`Debounce triggered (${debounceMs}ms)`);
 
     timer = setTimeout(() => {
       timer = null;
@@ -140,11 +138,8 @@ export function createCaptionMutationHandler({
   function handleMutations(mutations) {
     const segments = collectCaptionSegments(mutations);
     if (segments.size === 0) {
-      void log('Skipped processing: no subtitle nodes detected in mutation batch');
       return;
     }
-
-    console.log(`Caption observer found ${segments.size} segment(s).`);
 
     for (const segment of segments) {
       pendingSegments.add(segment);
@@ -154,9 +149,9 @@ export function createCaptionMutationHandler({
   }
 
   return {
-    handleMutations,
-    _internal: {
-      getPendingCount: () => pendingSegments.size
-    }
+    handleMutations
   };
 }
+
+window.hashText = hashText;
+window.createCaptionMutationHandler = createCaptionMutationHandler;
