@@ -6,15 +6,15 @@ const STOP_WORDS = new Set([
   'those', 'am'
 ]);
 
-export function isNumberToken(token) {
+function isNumberToken(token) {
   return /^\d+(?:[.,]\d+)?$/.test(token);
 }
 
-export function isPunctuationToken(token) {
+function isPunctuationToken(token) {
   return /^[^\p{L}\p{N}]+$/u.test(token);
 }
 
-export function isProperNounMidSentence(token, index) {
+function isProperNounMidSentence(token, index) {
   if (index === 0) {
     return false;
   }
@@ -22,7 +22,7 @@ export function isProperNounMidSentence(token, index) {
   return /^[A-Z][a-z]+$/.test(token);
 }
 
-export function shouldTranslateWord(token, index) {
+function shouldTranslateWord(token, index) {
   if (!token || token.length < 3) {
     return false;
   }
@@ -38,7 +38,7 @@ export function shouldTranslateWord(token, index) {
   return !STOP_WORDS.has(token.toLowerCase());
 }
 
-export function getUniqueTranslatableWordInfos(tokens) {
+function getUniqueTranslatableWordInfos(tokens) {
   const seen = new Set();
   const candidates = [];
 
@@ -56,3 +56,9 @@ export function getUniqueTranslatableWordInfos(tokens) {
 
   return candidates;
 }
+
+window.isNumberToken = isNumberToken;
+window.isPunctuationToken = isPunctuationToken;
+window.isProperNounMidSentence = isProperNounMidSentence;
+window.shouldTranslateWord = shouldTranslateWord;
+window.getUniqueTranslatableWordInfos = getUniqueTranslatableWordInfos;

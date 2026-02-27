@@ -1,11 +1,21 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
-import { buildImmersiveSubtitle, calculateReplacementCount, pickUniqueWordInfos } from '../extension/processor.js';
+
+function loadScript(path) {
+  const source = fs.readFileSync(path, 'utf8');
+  vm.runInThisContext(source, { filename: path });
+}
+
+globalThis.window = globalThis;
+loadScript('extension/stopwords.js');
+loadScript('extension/processor.js');
 
 describe('percentage replacement logic', () => {
   it('calculates replacement count safely', () => {
-    expect(calculateReplacementCount(0, 5)).toBe(0);
-    expect(calculateReplacementCount(2, 5)).toBe(1);
-    expect(calculateReplacementCount(10, 20)).toBe(2);
+    expect(window.calculateReplacementCount(0, 5)).toBe(0);
+    expect(window.calculateReplacementCount(2, 5)).toBe(1);
+    expect(window.calculateReplacementCount(10, 20)).toBe(2);
   });
 
   it('picks unique words based on percentage', () => {
@@ -16,7 +26,7 @@ describe('percentage replacement logic', () => {
     ];
 
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    const selected = pickUniqueWordInfos(candidates, 66);
+    const selected = window.pickUniqueWordInfos(candidates, 66);
     expect(selected.length).toBe(1);
     expect(selected[0].token).toBe('learning');
     vi.restoreAllMocks();
@@ -33,7 +43,7 @@ describe('percentage replacement logic', () => {
       return output;
     });
 
-    const output = await buildImmersiveSubtitle(
+    const output = await window.buildImmersiveSubtitle(
       'I enjoy learning skills daily',
       translateWordsMock,
       50

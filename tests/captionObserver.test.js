@@ -1,5 +1,11 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
-import { createCaptionMutationHandler } from '../extension/captionObserver.js';
+
+function loadScript(path) {
+  const source = fs.readFileSync(path, 'utf8');
+  vm.runInThisContext(source, { filename: path });
+}
 
 function createCaptionNode(text) {
   return {
@@ -20,11 +26,14 @@ function mutationForNode(node) {
 }
 
 describe('caption observer hardening', () => {
+  globalThis.window = globalThis;
+  loadScript('extension/captionObserver.js');
+
   it('prevents reprocessing for unchanged node text hash', async () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => text);
-    const handler = createCaptionMutationHandler({
+    const handler = window.createCaptionMutationHandler({
       getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
       transformSubtitle,
       debounceMs: 200
@@ -47,7 +56,7 @@ describe('caption observer hardening', () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => `${text} (x)`);
-    const handler = createCaptionMutationHandler({
+    const handler = window.createCaptionMutationHandler({
       getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
       transformSubtitle,
       debounceMs: 200
@@ -68,7 +77,7 @@ describe('caption observer hardening', () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => `${text} (done)`);
-    const handler = createCaptionMutationHandler({
+    const handler = window.createCaptionMutationHandler({
       getSettings: async () => ({ enabled: true, replacementPercentage: 5 }),
       transformSubtitle,
       debounceMs: 200

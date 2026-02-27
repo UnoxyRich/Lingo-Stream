@@ -1,9 +1,18 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cache, translateWord, translateWords } from '../extension/translation.js';
+
+function loadScript(path) {
+  const source = fs.readFileSync(path, 'utf8');
+  vm.runInThisContext(source, { filename: path });
+}
+
+globalThis.window = globalThis;
+loadScript('extension/translation.js');
 
 describe('translation layer', () => {
   beforeEach(() => {
-    Object.keys(cache).forEach((key) => delete cache[key]);
+    Object.keys(window.translationCache).forEach((key) => delete window.translationCache[key]);
 
     global.chrome = {
       storage: {
@@ -30,8 +39,8 @@ describe('translation layer', () => {
       json: async () => [{ translatedText: 'hola' }, { translatedText: 'mundo' }]
     }));
 
-    const first = await translateWords(['Hello', 'World']);
-    const second = await translateWords(['hello']);
+    const first = await window.translateWords(['Hello', 'World']);
+    const second = await window.translateWords(['hello']);
 
     expect(first.hello).toBe('hola');
     expect(first.world).toBe('mundo');
@@ -45,7 +54,7 @@ describe('translation layer', () => {
       .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) });
 
-    const result = await translateWords(['hello']);
+    const result = await window.translateWords(['hello']);
 
     expect(result).toEqual({ hello: 'hola' });
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -68,7 +77,7 @@ describe('translation layer', () => {
       json: async () => ({ translation: 'bonjour' })
     }));
 
-    const result = await translateWord('hello');
+    const result = await window.translateWord('hello');
 
     expect(result).toBe('bonjour');
     expect(global.fetch.mock.calls[0][0]).toContain('https://lingva.ml/api/v1/en/fr/hello');
@@ -81,7 +90,7 @@ describe('translation layer', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'mundo' }) });
 
-    const result = await translateWords(['hello', 'world']);
+    const result = await window.translateWords(['hello', 'world']);
 
     expect(result).toEqual({ hello: 'hola', world: 'mundo' });
     expect(global.fetch).toHaveBeenCalledTimes(3);
@@ -96,7 +105,7 @@ describe('translation layer', () => {
       })
     );
 
-    const result = await translateWord('timeout');
+    const result = await window.translateWord('timeout');
     expect(result).toBeNull();
     expect(console.warn).toHaveBeenCalled();
   });
@@ -104,7 +113,7 @@ describe('translation layer', () => {
   it('returns null for invalid response structure', async () => {
     global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ translated: 'bad' }) }));
 
-    const result = await translateWord('shape');
+    const result = await window.translateWord('shape');
     expect(result).toBeNull();
   });
 });
