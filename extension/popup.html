@@ -63,6 +63,12 @@
         margin-top: 8px;
         font-size: 12px;
       }
+
+      .hint {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.8;
+      }
     </style>
   </head>
   <body>
@@ -70,8 +76,12 @@
       <h1>YouTube Immersion Mode</h1>
 
       <div class="field">
-        <label for="apiKey">LibreTranslate API Key</label>
-        <input id="apiKey" name="apiKey" type="password" placeholder="Enter API key" autocomplete="off" />
+        <label for="translationProvider">Free translation provider</label>
+        <select id="translationProvider" name="translationProvider">
+          <option value="libre">LibreTranslate public mirror</option>
+          <option value="lingva">Lingva Translate proxy</option>
+        </select>
+        <p class="hint">No API key required. The extension automatically falls back if one provider is unavailable.</p>
       </div>
 
       <div class="field">

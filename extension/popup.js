@@ -1,5 +1,5 @@
 const DEFAULT_SETTINGS = {
-  apiKey: '',
+  translationProvider: 'libre',
   targetLanguage: 'es',
   replacementPercentage: 5,
   enabled: true
@@ -7,7 +7,7 @@ const DEFAULT_SETTINGS = {
 
 const storageKeys = Object.keys(DEFAULT_SETTINGS);
 
-const apiKeyInput = document.getElementById('apiKey');
+const translationProviderSelect = document.getElementById('translationProvider');
 const targetLanguageSelect = document.getElementById('targetLanguage');
 const replacementPercentageInput = document.getElementById('replacementPercentage');
 const replacementPercentageValue = document.getElementById('replacementPercentageValue');
@@ -21,7 +21,7 @@ function updateReplacementLabel(value) {
 
 function readFormSettings() {
   return {
-    apiKey: apiKeyInput.value.trim(),
+    translationProvider: translationProviderSelect.value,
     targetLanguage: targetLanguageSelect.value,
     replacementPercentage: Number.parseInt(replacementPercentageInput.value, 10),
     enabled: enabledInput.checked
@@ -29,7 +29,7 @@ function readFormSettings() {
 }
 
 function applySettingsToForm(settings) {
-  apiKeyInput.value = settings.apiKey;
+  translationProviderSelect.value = settings.translationProvider;
   targetLanguageSelect.value = settings.targetLanguage;
   replacementPercentageInput.value = String(settings.replacementPercentage);
   enabledInput.checked = settings.enabled;
