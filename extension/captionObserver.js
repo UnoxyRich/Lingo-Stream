@@ -19,10 +19,43 @@ function isCaptionSegment(node) {
   return isElementNode(node) && typeof node.matches === 'function' && node.matches('.ytp-caption-segment');
 }
 
+function findCaptionSegmentFromNode(node) {
+  if (!node) {
+    return null;
+  }
+
+  if (isCaptionSegment(node)) {
+    return node;
+  }
+
+  const parentElement = node.parentElement || node.parentNode;
+  if (!isElementNode(parentElement)) {
+    return null;
+  }
+
+  if (isCaptionSegment(parentElement)) {
+    return parentElement;
+  }
+
+  if (typeof parentElement.closest === 'function') {
+    return parentElement.closest('.ytp-caption-segment');
+  }
+
+  return null;
+}
+
 function collectCaptionSegments(mutations) {
   const segments = new Set();
 
   for (const mutation of mutations) {
+    if (mutation.type === 'characterData') {
+      const segment = findCaptionSegmentFromNode(mutation.target);
+      if (segment) {
+        segments.add(segment);
+      }
+      continue;
+    }
+
     if (mutation.type !== 'childList') {
       continue;
     }
@@ -46,6 +79,14 @@ function collectCaptionSegments(mutations) {
   }
 
   return segments;
+}
+
+function collectCurrentCaptionSegments() {
+  if (typeof document.querySelectorAll !== 'function') {
+    return new Set();
+  }
+
+  return new Set(document.querySelectorAll('.ytp-caption-segment'));
 }
 
 function createCaptionMutationHandler({
@@ -222,8 +263,22 @@ function createCaptionMutationHandler({
     schedule();
   }
 
+  function primeFromCurrentCaptions() {
+    const segments = collectCurrentCaptionSegments();
+    if (segments.size === 0) {
+      return;
+    }
+
+    for (const segment of segments) {
+      pendingSegments.add(segment);
+    }
+
+    schedule();
+  }
+
   return {
-    handleMutations
+    handleMutations,
+    primeFromCurrentCaptions
   };
 }
 

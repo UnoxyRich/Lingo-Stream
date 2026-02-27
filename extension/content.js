@@ -41,19 +41,23 @@ const observer = new MutationObserver((mutations) => {
 if (document.body) {
   observer.observe(document.body, {
     childList: true,
+    characterData: true,
     subtree: true
   });
   console.log('YouTube Immersion Mode observer attached to document.body');
+  handler.primeFromCurrentCaptions();
 } else {
   document.addEventListener(
     'DOMContentLoaded',
     () => {
       observer.observe(document.body, {
         childList: true,
+        characterData: true,
         subtree: true
       });
       console.log('YouTube Immersion Mode observer attached after DOMContentLoaded');
       void window.log?.('MutationObserver attached after DOMContentLoaded');
+      handler.primeFromCurrentCaptions();
     },
     { once: true }
   );
