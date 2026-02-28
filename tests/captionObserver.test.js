@@ -142,7 +142,7 @@ describe('caption observer hardening', () => {
     vi.useRealTimers();
   });
 
-  it('debounces rapid updates and avoids stacking overlapping runs', async () => {
+  it('debounces rapid updates and processes combined visible caption text once', async () => {
     vi.useFakeTimers();
 
     const transformSubtitle = vi.fn(async (text) => `${text} (done)`);
@@ -160,7 +160,8 @@ describe('caption observer hardening', () => {
     expect(transformSubtitle).toHaveBeenCalledTimes(0);
 
     await vi.advanceTimersByTimeAsync(2);
-    expect(transformSubtitle).toHaveBeenCalledTimes(3);
+    expect(transformSubtitle).toHaveBeenCalledTimes(1);
+    expect(transformSubtitle).toHaveBeenCalledWith('line one line two line three', 5);
 
     vi.useRealTimers();
   });
