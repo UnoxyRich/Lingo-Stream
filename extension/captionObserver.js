@@ -60,7 +60,17 @@ function collectCaptionSegments(mutations) {
       continue;
     }
 
+    const targetSegment = findCaptionSegmentFromNode(mutation.target);
+    if (targetSegment) {
+      segments.add(targetSegment);
+    }
+
     for (const addedNode of mutation.addedNodes) {
+      const segmentFromNode = findCaptionSegmentFromNode(addedNode);
+      if (segmentFromNode) {
+        segments.add(segmentFromNode);
+      }
+
       if (!isElementNode(addedNode)) {
         continue;
       }
