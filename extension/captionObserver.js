@@ -2,18 +2,6 @@ const DEFAULT_DEBOUNCE_MS = 200;
 const OVERLAY_CONTAINER_ID = 'immersion-caption-overlay';
 const OVERLAY_STYLE_ID = 'immersion-caption-overlay-style';
 
-function buildCaptionText(segments) {
-  if (!segments || segments.length === 0) {
-    return '';
-  }
-
-  return segments
-    .map((segment) => segment?.textContent?.trim() || '')
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-}
-
 function hashText(text) {
   let hash = 0;
   for (let index = 0; index < text.length; index += 1) {
@@ -117,12 +105,12 @@ function createCaptionMutationHandler({
   debounceMs = DEFAULT_DEBOUNCE_MS
 }) {
   const pendingSegments = new Set();
+  const lastProcessedByNode = new WeakMap();
   let timer = null;
   let isProcessing = false;
   let rerunRequested = false;
   let lastProcessedCaptionHash = null;
   let lastRenderedOverlayText = '';
-  const transformedCaptionByHash = new Map();
 
   function ensureOverlayStyle() {
     if (document.getElementById(OVERLAY_STYLE_ID)) {
@@ -218,37 +206,38 @@ function createCaptionMutationHandler({
     const batch = Array.from(pendingSegments);
     pendingSegments.clear();
 
-    const currentSegments = Array.from(collectCurrentCaptionSegments());
-    const originalText = buildCaptionText(currentSegments.length > 0 ? currentSegments : batch);
-    if (!originalText) {
-      void window.log?.('Skipped processing: no subtitles/empty subtitle text');
-      isProcessing = false;
-      return;
-    }
+    for (const node of batch) {
+      const originalText = node.textContent?.trim();
+      if (!originalText) {
+        void window.log?.('Skipped processing: no subtitles/empty subtitle text');
+        continue;
+      }
 
-    console.log('Caption detected.', originalText);
-    void window.log?.(`Subtitle node detected: "${originalText}"`);
+      console.log('Caption detected.', originalText);
+      void window.log?.(`Subtitle node detected: "${originalText}"`);
 
-    const originalHash = hashText(originalText);
-    if (lastProcessedCaptionHash === originalHash) {
-      void window.log?.('Skipped processing: duplicate subtitle hash');
-      isProcessing = false;
-      return;
-    }
+      const originalHash = hashText(originalText);
+      if (lastProcessedByNode.get(node) === originalHash) {
+        void window.log?.('Skipped processing: already processed subtitle node');
+        continue;
+      }
 
-    console.log('Processing subtitle text.', originalText);
-    void window.log?.(`Processing subtitle: "${originalText}"`);
+      if (lastProcessedCaptionHash === originalHash) {
+        lastProcessedByNode.set(node, originalHash);
+        void window.log?.('Skipped processing: duplicate subtitle hash');
+        continue;
+      }
 
-    let renderedSubtitle = transformedCaptionByHash.get(originalHash);
-    if (!renderedSubtitle) {
+      console.log('Processing subtitle text.', originalText);
+      void window.log?.(`Processing subtitle: "${originalText}"`);
       const transformed = await transformSubtitle(originalText, replacementPercentage);
-      renderedSubtitle = transformed || originalText;
-      transformedCaptionByHash.set(originalHash, renderedSubtitle);
-    }
+      const renderedSubtitle = transformed || originalText;
+      renderOverlay(renderedSubtitle);
+      void window.log?.(`Overlay subtitle updated: "${renderedSubtitle}"`);
 
-    renderOverlay(renderedSubtitle);
-    void window.log?.(`Overlay subtitle updated: "${renderedSubtitle}"`);
-    lastProcessedCaptionHash = originalHash;
+      lastProcessedByNode.set(node, originalHash);
+      lastProcessedCaptionHash = originalHash;
+    }
 
     isProcessing = false;
 
