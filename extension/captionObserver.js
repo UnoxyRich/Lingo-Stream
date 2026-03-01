@@ -1,4 +1,5 @@
 const DEFAULT_DEBOUNCE_MS = 200;
+const CAPTION_SEGMENT_SELECTOR = '.ytp-caption-segment, .captions-text .caption-visual-line span';
 
 function hashText(text) {
   let hash = 0;
@@ -14,7 +15,7 @@ function isElementNode(node) {
 }
 
 function isCaptionSegment(node) {
-  return isElementNode(node) && typeof node.matches === 'function' && node.matches('.ytp-caption-segment');
+  return isElementNode(node) && typeof node.matches === 'function' && node.matches(CAPTION_SEGMENT_SELECTOR);
 }
 
 function findCaptionSegmentFromNode(node) {
@@ -36,7 +37,7 @@ function findCaptionSegmentFromNode(node) {
   }
 
   if (typeof parentElement.closest === 'function') {
-    return parentElement.closest('.ytp-caption-segment');
+    return parentElement.closest(CAPTION_SEGMENT_SELECTOR);
   }
 
   return null;
@@ -78,7 +79,7 @@ function collectCaptionSegments(mutations) {
       }
 
       if (typeof addedNode.querySelectorAll === 'function') {
-        const nested = addedNode.querySelectorAll('.ytp-caption-segment');
+        const nested = addedNode.querySelectorAll(CAPTION_SEGMENT_SELECTOR);
         for (const segment of nested) {
           segments.add(segment);
         }
@@ -94,7 +95,7 @@ function collectCurrentCaptionSegments() {
     return new Set();
   }
 
-  return new Set(document.querySelectorAll('.ytp-caption-segment'));
+  return new Set(document.querySelectorAll(CAPTION_SEGMENT_SELECTOR));
 }
 
 function createCaptionMutationHandler({

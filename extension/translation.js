@@ -1,79 +1,11 @@
 const cache = {};
 
-const DEFAULT_TIMEOUT_MS = 3000;
-const LIBRE_ENDPOINTS = [
-  'https://libretranslate.com/translate',
-  'https://translate.argosopentech.com/translate'
-];
+const DEFAULT_TIMEOUT_MS = 3500;
 
 function getFromStorage(keys) {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(keys, (items) => resolve(items));
+    chrome.storage.sync.get(keys, (items) => resolve(items ?? {}));
   });
-}
-
-function buildLibreRequestBody(q, settings) {
-  return {
-    q,
-    source: settings.sourceLanguage,
-    target: settings.targetLanguage,
-    format: 'text'
-  };
-}
-
-function normalizeLibreTranslation(word, payload) {
-  if (typeof payload?.translatedText !== 'string' || !payload.translatedText.trim()) {
-    return null;
-  }
-
-  return {
-    [word.toLowerCase()]: payload.translatedText.trim()
-  };
-}
-
-async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-
-  try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function requestLibreTranslationFromEndpoint(word, settings, endpoint) {
-  void window.log?.(`Translation API called (libre): ${word} @ ${endpoint}`);
-  const response = await fetchWithTimeout(
-    endpoint,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(buildLibreRequestBody(word, settings))
-    },
-    settings.translationTimeoutMs
-  );
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      console.warn('LibreTranslate rate limit reached.');
-    }
-
-    void window.log?.(`Translation API failed (libre): endpoint=${endpoint}, status=${response.status}`);
-    return null;
-  }
-
-  const payload = await response.json();
-  const normalized = normalizeLibreTranslation(word, payload);
-  void window.log?.(`Translation API response valid (libre): ${Boolean(normalized)}`);
-  return normalized;
 }
 
 function toUniqueWords(words) {
@@ -93,17 +25,17 @@ function toUniqueWords(words) {
 
 async function getTranslationSettings() {
   const settings = await getFromStorage([
-    'translationProvider',
     'targetLanguage',
     'sourceLanguage',
     'translationEndpoint',
     'translationTimeoutMs'
   ]);
 
-  const customEndpoint = typeof settings.translationEndpoint === 'string' ? settings.translationEndpoint.trim() : '';
+  const customEndpoint = typeof settings.translationEndpoint === 'string'
+    ? settings.translationEndpoint.trim()
+    : '';
 
   return {
-    translationProvider: 'libre',
     targetLanguage: settings.targetLanguage ?? 'es',
     sourceLanguage: settings.sourceLanguage ?? 'en',
     translationEndpoint: customEndpoint,
@@ -111,43 +43,36 @@ async function getTranslationSettings() {
   };
 }
 
-function resolveEndpointCandidates(settings) {
-  const endpoints = [];
+function requestBackgroundTranslations(words, settings) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        type: 'IMMERSION_TRANSLATE_WORDS',
+        payload: {
+          words,
+          targetLanguage: settings.targetLanguage,
+          sourceLanguage: settings.sourceLanguage,
+          translationEndpoint: settings.translationEndpoint,
+          translationTimeoutMs: settings.translationTimeoutMs
+        }
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          void window.log?.(`Translation bridge failed: ${chrome.runtime.lastError.message}`);
+          resolve(null);
+          return;
+        }
 
-  if (settings.translationEndpoint) {
-    endpoints.push(settings.translationEndpoint);
-  }
+        if (!response?.ok || typeof response.translations !== 'object' || response.translations === null) {
+          void window.log?.(`Translation bridge returned no data: ${response?.error ?? 'unknown_error'}`);
+          resolve(null);
+          return;
+        }
 
-  for (const endpoint of LIBRE_ENDPOINTS) {
-    if (!endpoints.includes(endpoint)) {
-      endpoints.push(endpoint);
-    }
-  }
-
-  return endpoints;
-}
-
-async function requestOneWord(word, settings) {
-  const endpoints = resolveEndpointCandidates(settings);
-
-  for (const endpoint of endpoints) {
-    try {
-      const translated = await requestLibreTranslationFromEndpoint(word, settings, endpoint);
-      if (translated) {
-        return translated;
+        resolve(response.translations);
       }
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        console.warn(`Translation request timed out for endpoint: ${endpoint}`);
-        void window.log?.(`Translation API timeout: endpoint=${endpoint}`);
-      } else {
-        console.warn(`Translation request failed for endpoint: ${endpoint}`, error);
-        void window.log?.(`Translation API error: endpoint=${endpoint}`);
-      }
-    }
-  }
-
-  return null;
+    );
+  });
 }
 
 async function translateWords(words) {
@@ -172,28 +97,28 @@ async function translateWords(words) {
   const settings = await getTranslationSettings();
   void window.log?.(`Word translation batch started: ${JSON.stringify(misses)}`);
 
-  const results = await Promise.all(
-    misses.map(async (word) => {
-      const single = await requestOneWord(word, settings);
-      return { word, single };
-    })
-  );
+  const fetched = await requestBackgroundTranslations(misses, settings);
+  if (!fetched) {
+    void window.log?.('Translation batch failed in background bridge');
+    return translations;
+  }
 
-  for (const { word, single } of results) {
-    if (!single) {
-      void window.log?.(`Translation unavailable: ${word}`);
+  for (const [normalized, translated] of Object.entries(fetched)) {
+    if (typeof translated !== 'string' || !translated.trim()) {
       continue;
     }
 
+    const cleanTranslated = translated.trim();
+    cache[normalized] = cleanTranslated;
+    translations[normalized] = cleanTranslated;
+    void window.log?.(`Translation success: ${normalized} -> ${cleanTranslated}`);
+  }
+
+  for (const word of misses) {
     const normalized = word.toLowerCase();
-    const translated = single[normalized];
-    if (!translated) {
-      continue;
+    if (!translations[normalized]) {
+      void window.log?.(`Translation unavailable: ${word}`);
     }
-
-    cache[normalized] = translated;
-    translations[normalized] = translated;
-    void window.log?.(`Translation success: ${word} -> ${translated}`);
   }
 
   return translations;

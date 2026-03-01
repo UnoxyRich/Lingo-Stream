@@ -13,6 +13,9 @@
     "https://libretranslate.com/*",
     "https://translate.argosopentech.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html"
   },

@@ -1,3 +1,6 @@
+const WORD_TOKEN_PATTERN = /^\p{L}[\p{L}\p{M}'-]*$/u;
+const TOKEN_SPLIT_PATTERN = /\p{L}[\p{L}\p{M}'-]*|\s+|[^\s\p{L}\p{M}]+/gu;
+
 function calculateReplacementCount(totalCandidates, replacementPercentage = 5) {
   if (totalCandidates <= 0 || replacementPercentage <= 0) {
     return 0;
@@ -24,6 +27,50 @@ function pickUniqueWordInfos(candidates, replacementPercentage = 5) {
   return chosen;
 }
 
+function tokenizeSubtitle(text) {
+  const tokens = [];
+  let wordIndex = 0;
+
+  for (const value of text.match(TOKEN_SPLIT_PATTERN) ?? []) {
+    const isWord = WORD_TOKEN_PATTERN.test(value);
+    tokens.push({
+      value,
+      isWord,
+      wordIndex: isWord ? wordIndex++ : -1
+    });
+  }
+
+  return tokens;
+}
+
+function collectCandidateWordInfos(tokens) {
+  const seen = new Set();
+  const candidates = [];
+
+  for (const token of tokens) {
+    if (!token.isWord) {
+      continue;
+    }
+
+    const normalized = token.value.toLowerCase();
+    if (seen.has(normalized)) {
+      continue;
+    }
+
+    if (!window.shouldTranslateWord(token.value, token.wordIndex)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    candidates.push({
+      token: token.value,
+      normalized
+    });
+  }
+
+  return candidates;
+}
+
 async function buildImmersiveSubtitle(text, translateWords, replacementPercentage = 5) {
   if (!text || !text.trim()) {
     void window.log?.('Skipped processing: no subtitles');
@@ -35,9 +82,8 @@ async function buildImmersiveSubtitle(text, translateWords, replacementPercentag
     return text;
   }
 
-  const tokens = text.split(/(\s+)/);
-  const wordOnlyTokens = tokens.filter((token) => token.trim().length > 0);
-  const candidateWordInfos = window.getUniqueTranslatableWordInfos(wordOnlyTokens);
+  const tokens = tokenizeSubtitle(text);
+  const candidateWordInfos = collectCandidateWordInfos(tokens);
   const selected = pickUniqueWordInfos(candidateWordInfos, replacementPercentage);
 
   if (selected.length === 0) {
@@ -47,22 +93,22 @@ async function buildImmersiveSubtitle(text, translateWords, replacementPercentag
 
   const selectedWords = selected.map(({ token }) => token);
   void window.log?.(`Words selected: ${JSON.stringify(selectedWords)}`);
+
   const translatedByNormalized = await translateWords(selectedWords);
 
   return tokens
     .map((token) => {
-      const trimmed = token.trim();
-      if (!trimmed) {
-        return token;
+      if (!token.isWord) {
+        return token.value;
       }
 
-      const normalized = trimmed.toLowerCase();
+      const normalized = token.value.toLowerCase();
       const translated = translatedByNormalized[normalized];
       if (!translated) {
-        return token;
+        return token.value;
       }
 
-      return `${trimmed} (${translated})`;
+      return `${token.value} (${translated})`;
     })
     .join('');
 }
