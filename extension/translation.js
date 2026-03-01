@@ -1,6 +1,8 @@
 const cache = {};
+const missCache = {};
 
-const DEFAULT_TIMEOUT_MS = 3500;
+const DEFAULT_TIMEOUT_MS = 2500;
+const MISS_CACHE_TTL_MS = 3 * 60 * 1000;
 
 function getFromStorage(keys) {
   return new Promise((resolve) => {
@@ -23,8 +25,23 @@ function toUniqueWords(words) {
   return unique;
 }
 
+function isMissCached(normalized, now = Date.now()) {
+  const missedAt = missCache[normalized];
+  if (!missedAt) {
+    return false;
+  }
+
+  if (now - missedAt > MISS_CACHE_TTL_MS) {
+    delete missCache[normalized];
+    return false;
+  }
+
+  return true;
+}
+
 async function getTranslationSettings() {
   const settings = await getFromStorage([
+    'translationProvider',
     'targetLanguage',
     'sourceLanguage',
     'translationEndpoint',
@@ -36,6 +53,7 @@ async function getTranslationSettings() {
     : '';
 
   return {
+    translationProvider: settings.translationProvider ?? 'auto',
     targetLanguage: settings.targetLanguage ?? 'es',
     sourceLanguage: settings.sourceLanguage ?? 'en',
     translationEndpoint: customEndpoint,
@@ -50,6 +68,7 @@ function requestBackgroundTranslations(words, settings) {
         type: 'IMMERSION_TRANSLATE_WORDS',
         payload: {
           words,
+          translationProvider: settings.translationProvider,
           targetLanguage: settings.targetLanguage,
           sourceLanguage: settings.sourceLanguage,
           translationEndpoint: settings.translationEndpoint,
@@ -69,7 +88,7 @@ function requestBackgroundTranslations(words, settings) {
           return;
         }
 
-        resolve(response.translations);
+        resolve(response);
       }
     );
   });
@@ -79,15 +98,22 @@ async function translateWords(words) {
   const translations = {};
   const uniqueWords = toUniqueWords(words);
   const misses = [];
+  const now = Date.now();
 
   for (const word of uniqueWords) {
     const normalized = word.toLowerCase();
     if (cache[normalized]) {
       translations[normalized] = cache[normalized];
       void window.log?.(`Cache hit: ${word}`);
-    } else {
-      misses.push(word);
+      continue;
     }
+
+    if (isMissCached(normalized, now)) {
+      void window.log?.(`Miss cache hit: ${word}`);
+      continue;
+    }
+
+    misses.push(word);
   }
 
   if (misses.length === 0) {
@@ -95,29 +121,49 @@ async function translateWords(words) {
   }
 
   const settings = await getTranslationSettings();
-  void window.log?.(`Word translation batch started: ${JSON.stringify(misses)}`);
+  void window.log?.(
+    `Word translation batch started: ${JSON.stringify(misses)} (provider=${settings.translationProvider})`
+  );
 
   const fetched = await requestBackgroundTranslations(misses, settings);
   if (!fetched) {
     void window.log?.('Translation batch failed in background bridge');
+
+    for (const word of misses) {
+      missCache[word.toLowerCase()] = now;
+    }
+
     return translations;
   }
 
-  for (const [normalized, translated] of Object.entries(fetched)) {
+  for (const [normalized, translated] of Object.entries(fetched.translations)) {
     if (typeof translated !== 'string' || !translated.trim()) {
       continue;
     }
 
     const cleanTranslated = translated.trim();
     cache[normalized] = cleanTranslated;
+    delete missCache[normalized];
     translations[normalized] = cleanTranslated;
-    void window.log?.(`Translation success: ${normalized} -> ${cleanTranslated}`);
+
+    const providerUsed = fetched.meta?.providerByWord?.[normalized];
+    if (providerUsed) {
+      void window.log?.(`Translation success (${providerUsed}): ${normalized} -> ${cleanTranslated}`);
+    } else {
+      void window.log?.(`Translation success: ${normalized} -> ${cleanTranslated}`);
+    }
   }
 
   for (const word of misses) {
     const normalized = word.toLowerCase();
     if (!translations[normalized]) {
-      void window.log?.(`Translation unavailable: ${word}`);
+      missCache[normalized] = now;
+      const failedProviders = fetched.meta?.failedProvidersByWord?.[normalized];
+      if (Array.isArray(failedProviders) && failedProviders.length > 0) {
+        void window.log?.(`Translation unavailable (${failedProviders.join('>')}): ${word}`);
+      } else {
+        void window.log?.(`Translation unavailable: ${word}`);
+      }
     }
   }
 
@@ -130,5 +176,6 @@ async function translateWord(word) {
 }
 
 window.translationCache = cache;
+window.translationMissCache = missCache;
 window.translateWords = translateWords;
 window.translateWord = translateWord;

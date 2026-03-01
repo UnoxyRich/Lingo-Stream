@@ -1,5 +1,5 @@
 const DEFAULT_SETTINGS = {
-  translationProvider: 'libre',
+  translationProvider: 'auto',
   targetLanguage: 'es',
   replacementPercentage: 5,
   enabled: true
@@ -9,7 +9,7 @@ const DEBUG_STORAGE_KEYS = {
   logs: 'debugLogs'
 };
 const LOG_POLL_INTERVAL_MS = 500;
-const SUPPORTED_PROVIDERS = new Set(['libre']);
+const SUPPORTED_PROVIDERS = new Set(['auto', 'libre', 'apertium', 'mymemory']);
 
 const storageKeys = Object.keys(DEFAULT_SETTINGS);
 

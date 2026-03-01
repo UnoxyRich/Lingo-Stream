@@ -113,7 +113,6 @@ function createCaptionMutationHandler({
   async function processQueue() {
     if (isProcessing) {
       rerunRequested = true;
-      void window.log?.('Processing already running; rerun requested');
       return;
     }
 
@@ -172,6 +171,11 @@ function createCaptionMutationHandler({
   }
 
   function schedule() {
+    if (isProcessing) {
+      rerunRequested = true;
+      return;
+    }
+
     if (timer) {
       clearTimeout(timer);
     }

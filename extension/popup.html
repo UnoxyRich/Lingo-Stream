@@ -106,9 +106,12 @@
       <div class="field">
         <label for="translationProvider">Translation provider</label>
         <select id="translationProvider" name="translationProvider">
+          <option value="auto">Auto fallback (Recommended)</option>
           <option value="libre">LibreTranslate public mirrors</option>
+          <option value="apertium">Apertium APY</option>
+          <option value="mymemory">MyMemory</option>
         </select>
-        <p class="hint">No API key required. The extension automatically retries across public LibreTranslate mirrors.</p>
+        <p class="hint">Auto tries multiple free providers in order and uses the first successful translation.</p>
       </div>
 
       <div class="field">
