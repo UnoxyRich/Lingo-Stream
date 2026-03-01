@@ -104,12 +104,11 @@
       <h1>YouTube Immersion Mode</h1>
 
       <div class="field">
-        <label for="translationProvider">Free translation provider</label>
+        <label for="translationProvider">Translation provider</label>
         <select id="translationProvider" name="translationProvider">
-          <option value="libre">LibreTranslate public mirror</option>
-          <option value="lingva">Lingva Translate proxy</option>
+          <option value="libre">LibreTranslate public mirrors</option>
         </select>
-        <p class="hint">No API key required. The extension automatically falls back if one provider is unavailable.</p>
+        <p class="hint">No API key required. The extension automatically retries across public LibreTranslate mirrors.</p>
       </div>
 
       <div class="field">

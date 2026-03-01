@@ -1,6 +1,4 @@
 const DEFAULT_DEBOUNCE_MS = 200;
-const OVERLAY_CONTAINER_ID = 'immersion-caption-overlay';
-const OVERLAY_STYLE_ID = 'immersion-caption-overlay-style';
 
 function hashText(text) {
   let hash = 0;
@@ -106,83 +104,10 @@ function createCaptionMutationHandler({
 }) {
   const pendingSegments = new Set();
   const lastProcessedByNode = new WeakMap();
+  const lastRenderedByNode = new WeakMap();
   let timer = null;
   let isProcessing = false;
   let rerunRequested = false;
-  let lastProcessedCaptionHash = null;
-  let lastRenderedOverlayText = '';
-
-  function ensureOverlayStyle() {
-    if (document.getElementById(OVERLAY_STYLE_ID)) {
-      return;
-    }
-
-    const style = document.createElement('style');
-    style.id = OVERLAY_STYLE_ID;
-    style.textContent = `
-      .ytp-caption-window-container {
-        opacity: 0 !important;
-        pointer-events: none !important;
-      }
-
-      #${OVERLAY_CONTAINER_ID} {
-        position: absolute;
-        left: 50%;
-        bottom: 8%;
-        transform: translateX(-50%);
-        width: min(90%, 960px);
-        color: #fff;
-        text-align: center;
-        font-size: clamp(20px, 2.8vw, 34px);
-        line-height: 1.35;
-        text-shadow:
-          -1px -1px 0 #000,
-          1px -1px 0 #000,
-          -1px 1px 0 #000,
-          1px 1px 0 #000,
-          0 0 8px rgba(0, 0, 0, 0.8);
-        z-index: 60;
-        pointer-events: none;
-        font-family: "YouTube Noto", Roboto, Arial, Helvetica, sans-serif;
-        white-space: pre-wrap;
-      }
-    `;
-
-    document.head.appendChild(style);
-  }
-
-  function ensureOverlayNode() {
-    ensureOverlayStyle();
-
-    const existing = document.getElementById(OVERLAY_CONTAINER_ID);
-    if (existing) {
-      return existing;
-    }
-
-    const player = document.querySelector('.html5-video-player') || document.body;
-    if (!player) {
-      return null;
-    }
-
-    const overlay = document.createElement('div');
-    overlay.id = OVERLAY_CONTAINER_ID;
-    player.appendChild(overlay);
-    return overlay;
-  }
-
-  function renderOverlay(text) {
-    const overlay = ensureOverlayNode();
-    if (!overlay) {
-      return;
-    }
-
-    if (text === lastRenderedOverlayText) {
-      return;
-    }
-
-    overlay.innerText = text;
-    lastRenderedOverlayText = text;
-  }
 
   async function processQueue() {
     if (isProcessing) {
@@ -196,7 +121,6 @@ function createCaptionMutationHandler({
     const { enabled, replacementPercentage } = await getSettings();
 
     if (!enabled) {
-      console.log('Immersion mode disabled. Skipping caption processing.');
       void window.log?.('Skipped processing: immersion mode disabled');
       pendingSegments.clear();
       isProcessing = false;
@@ -213,30 +137,29 @@ function createCaptionMutationHandler({
         continue;
       }
 
-      console.log('Caption detected.', originalText);
-      void window.log?.(`Subtitle node detected: "${originalText}"`);
-
       const originalHash = hashText(originalText);
       if (lastProcessedByNode.get(node) === originalHash) {
         void window.log?.('Skipped processing: already processed subtitle node');
         continue;
       }
 
-      if (lastProcessedCaptionHash === originalHash) {
+      if (lastRenderedByNode.get(node) === originalHash) {
         lastProcessedByNode.set(node, originalHash);
-        void window.log?.('Skipped processing: duplicate subtitle hash');
+        void window.log?.('Skipped processing: self-rendered subtitle mutation');
         continue;
       }
 
-      console.log('Processing subtitle text.', originalText);
       void window.log?.(`Processing subtitle: "${originalText}"`);
       const transformed = await transformSubtitle(originalText, replacementPercentage);
       const renderedSubtitle = transformed || originalText;
-      renderOverlay(renderedSubtitle);
-      void window.log?.(`Overlay subtitle updated: "${renderedSubtitle}"`);
 
-      lastProcessedByNode.set(node, originalHash);
-      lastProcessedCaptionHash = originalHash;
+      if (renderedSubtitle !== originalText) {
+        node.textContent = renderedSubtitle;
+        lastRenderedByNode.set(node, hashText(renderedSubtitle));
+        void window.log?.(`Subtitle updated in place: "${renderedSubtitle}"`);
+      }
+
+      lastProcessedByNode.set(node, hashText(node.textContent?.trim() || renderedSubtitle));
     }
 
     isProcessing = false;

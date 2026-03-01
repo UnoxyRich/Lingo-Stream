@@ -9,6 +9,7 @@ const DEBUG_STORAGE_KEYS = {
   logs: 'debugLogs'
 };
 const LOG_POLL_INTERVAL_MS = 500;
+const SUPPORTED_PROVIDERS = new Set(['libre']);
 
 const storageKeys = Object.keys(DEFAULT_SETTINGS);
 
@@ -31,7 +32,9 @@ function updateReplacementLabel(value) {
 
 function readFormSettings() {
   return {
-    translationProvider: translationProviderSelect.value,
+    translationProvider: SUPPORTED_PROVIDERS.has(translationProviderSelect.value)
+      ? translationProviderSelect.value
+      : DEFAULT_SETTINGS.translationProvider,
     targetLanguage: targetLanguageSelect.value,
     replacementPercentage: Number.parseInt(replacementPercentageInput.value, 10),
     enabled: enabledInput.checked
@@ -39,7 +42,11 @@ function readFormSettings() {
 }
 
 function applySettingsToForm(settings) {
-  translationProviderSelect.value = settings.translationProvider;
+  const safeProvider = SUPPORTED_PROVIDERS.has(settings.translationProvider)
+    ? settings.translationProvider
+    : DEFAULT_SETTINGS.translationProvider;
+
+  translationProviderSelect.value = safeProvider;
   targetLanguageSelect.value = settings.targetLanguage;
   replacementPercentageInput.value = String(settings.replacementPercentage);
   enabledInput.checked = settings.enabled;

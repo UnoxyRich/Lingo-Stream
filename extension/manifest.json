@@ -10,8 +10,8 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://translate.cutie.dating/*",
-    "https://lingva.ml/*"
+    "https://libretranslate.com/*",
+    "https://translate.argosopentech.com/*"
   ],
   "action": {
     "default_popup": "popup.html"
