@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #005540;
+      }
+
+      .cls-2 {
+        fill: #fff;
+        font-family: MicrosoftSansSerif, 'Microsoft Sans Serif';
+        font-size: 110px;
+      }
+    </style>
+  </defs>
+  <rect class="cls-1" x="3.81" y="3.87" width="152.38" height="152.38" rx="30.46" ry="30.46"/>
+  <text class="cls-2" transform="translate(49.41 113.12)"><tspan x="0" y="0">L</tspan></text>
+</svg>

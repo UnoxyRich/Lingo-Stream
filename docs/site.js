@@ -12,7 +12,7 @@ function inferRepositoryUrl() {
 }
 
 const ORIGINAL_LINE = 'I really enjoy learning new skills every day.';
-const PREVIEW_TOKENS = [
+const TOKENS = [
   { text: 'I' },
   { text: 'really' },
   { text: 'enjoy', key: 'enjoy' },
@@ -24,55 +24,13 @@ const PREVIEW_TOKENS = [
 ];
 const REPLACEMENT_PRIORITY = ['skills', 'enjoy', 'learning', 'every', 'day'];
 const TRANSLATIONS_BY_LANGUAGE = {
-  es: {
-    enjoy: 'disfrutar',
-    learning: 'aprender',
-    skills: 'habilidades',
-    every: 'cada',
-    day: 'dia'
-  },
-  fr: {
-    enjoy: 'profiter',
-    learning: 'apprendre',
-    skills: 'competences',
-    every: 'chaque',
-    day: 'jour'
-  },
-  de: {
-    enjoy: 'geniessen',
-    learning: 'lernen',
-    skills: 'fertigkeiten',
-    every: 'jeden',
-    day: 'tag'
-  },
-  it: {
-    enjoy: 'godere',
-    learning: 'imparare',
-    skills: 'abilita',
-    every: 'ogni',
-    day: 'giorno'
-  },
-  pt: {
-    enjoy: 'curtir',
-    learning: 'aprender',
-    skills: 'habilidades',
-    every: 'cada',
-    day: 'dia'
-  },
-  ja: {
-    enjoy: 'tanoshimu',
-    learning: 'manabu',
-    skills: 'sukiru',
-    every: 'mai',
-    day: 'hi'
-  },
-  ko: {
-    enjoy: 'jeulgida',
-    learning: 'baeuda',
-    skills: 'gisul',
-    every: 'maeil',
-    day: 'nal'
-  }
+  es: { enjoy: 'disfrutar', learning: 'aprender', skills: 'habilidades', every: 'cada', day: 'dia' },
+  fr: { enjoy: 'profiter', learning: 'apprendre', skills: 'competences', every: 'chaque', day: 'jour' },
+  de: { enjoy: 'geniessen', learning: 'lernen', skills: 'fertigkeiten', every: 'jeden', day: 'tag' },
+  it: { enjoy: 'godere', learning: 'imparare', skills: 'abilita', every: 'ogni', day: 'giorno' },
+  pt: { enjoy: 'curtir', learning: 'aprender', skills: 'habilidades', every: 'cada', day: 'dia' },
+  ja: { enjoy: 'tanoshimu', learning: 'manabu', skills: 'sukiru', every: 'mai', day: 'hi' },
+  ko: { enjoy: 'jeulgida', learning: 'baeuda', skills: 'gisul', every: 'maeil', day: 'nal' }
 };
 
 function escapeHtml(value) {
@@ -104,9 +62,10 @@ function buildTranslatedLine(language, replacementPercentage, enabled) {
   const selected = new Set(REPLACEMENT_PRIORITY.slice(0, replacementCount));
   const fragments = [];
 
-  for (const token of PREVIEW_TOKENS) {
+  for (const token of TOKENS) {
     const safeWord = escapeHtml(token.text);
     const suffix = token.suffix ? escapeHtml(token.suffix) : '';
+
     if (!token.key || !enabled || !selected.has(token.key)) {
       fragments.push(`${safeWord}${suffix}`);
       continue;
@@ -141,36 +100,10 @@ function attachRepositoryLinks(repositoryUrl) {
   for (const linkNode of linkNodes) {
     linkNode.href = repositoryUrl;
   }
-
-  const cloneNode = document.getElementById('clone-command');
-  if (cloneNode) {
-    cloneNode.textContent = `git clone ${repositoryUrl}.git`;
-  }
-}
-
-function attachCopyClone() {
-  const copyButton = document.getElementById('copy-clone');
-  const cloneNode = document.getElementById('clone-command');
-  if (!copyButton || !cloneNode) {
-    return;
-  }
-
-  copyButton.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(cloneNode.textContent || '');
-      copyButton.textContent = 'Copied';
-    } catch (_error) {
-      copyButton.textContent = 'Failed';
-    }
-
-    setTimeout(() => {
-      copyButton.textContent = 'Copy';
-    }, 1200);
-  });
 }
 
 function attachRevealAnimation() {
-  const revealNodes = document.querySelectorAll('.reveal');
+  const revealNodes = document.querySelectorAll('[data-reveal]');
   if (revealNodes.length === 0) {
     return;
   }
@@ -182,16 +115,74 @@ function attachRevealAnimation() {
           continue;
         }
 
+        const delayMs = Number.parseInt(entry.target.dataset.delay || '0', 10);
+        entry.target.style.transitionDelay = `${Math.max(0, delayMs)}ms`;
         entry.target.classList.add('visible');
         observer.unobserve(entry.target);
       }
     },
-    { threshold: 0.18 }
+    { threshold: 0.2 }
   );
 
   for (const revealNode of revealNodes) {
     observer.observe(revealNode);
   }
+}
+
+function attachTopbarContraction() {
+  const topbar = document.getElementById('topbar');
+  if (!topbar) {
+    return;
+  }
+
+  let ticking = false;
+
+  const update = () => {
+    const scrolled = window.scrollY > 30;
+    topbar.classList.toggle('compact', scrolled);
+    ticking = false;
+  };
+
+  const onScroll = () => {
+    if (ticking) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(update);
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  update();
+}
+
+function attachBackgroundParallax() {
+  const glowA = document.querySelector('.glow-a');
+  const glowB = document.querySelector('.glow-b');
+  if (!glowA || !glowB) {
+    return;
+  }
+
+  let ticking = false;
+
+  const update = () => {
+    const y = window.scrollY || 0;
+    glowA.style.transform = `translate3d(${-y * 0.02}px, ${y * 0.04}px, 0)`;
+    glowB.style.transform = `translate3d(${y * 0.018}px, ${-y * 0.03}px, 0)`;
+    ticking = false;
+  };
+
+  const onScroll = () => {
+    if (ticking) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(update);
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  update();
 }
 
 function attachInteractivePreview() {
@@ -247,23 +238,23 @@ function attachInteractivePreview() {
   languageInput.addEventListener('change', updatePreview);
   replacementInput.addEventListener('input', updatePreview);
   enabledInput.addEventListener('change', updatePreview);
+
   updatePreview();
 }
 
 function updateCopyrightYear() {
   const yearNode = document.getElementById('year');
-  if (!yearNode) {
-    return;
+  if (yearNode) {
+    yearNode.textContent = String(new Date().getFullYear());
   }
-
-  yearNode.textContent = String(new Date().getFullYear());
 }
 
 function initializeSite() {
   const repositoryUrl = inferRepositoryUrl();
   attachRepositoryLinks(repositoryUrl);
-  attachCopyClone();
   attachRevealAnimation();
+  attachTopbarContraction();
+  attachBackgroundParallax();
   attachInteractivePreview();
   updateCopyrightYear();
 }
