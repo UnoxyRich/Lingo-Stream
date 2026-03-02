@@ -14,13 +14,13 @@ const PERSISTENT_REFRESH_INTERVAL_MS = 350;
 const MIN_FORCE_REFRESH_GAP_MS = 120;
 const INITIAL_WARMUP_INTERVAL_MS = 250;
 const INITIAL_WARMUP_RUNS = 8;
-const CONTENT_READY_MESSAGE = 'IMMERSION_HEALTH_CHECK';
-const CONTENT_REFRESH_MESSAGE = 'IMMERSION_FORCE_REFRESH';
+const CONTENT_READY_MESSAGE = 'LINGO_STREAM_HEALTH_CHECK';
+const CONTENT_REFRESH_MESSAGE = 'LINGO_STREAM_FORCE_REFRESH';
 
-if (window.__immersionContentInitialized) {
+if (window.__lingoStreamContentInitialized) {
   void window.log?.('content.js already initialized; duplicate setup skipped');
 } else {
-  window.__immersionContentInitialized = true;
+  window.__lingoStreamContentInitialized = true;
 
 function normalizeReplacementPercentage(value) {
   const numeric = Number(value);
@@ -62,7 +62,7 @@ let cachedSettings = {
 let lastSettingsReadAt = 0;
 let inflightSettingsPromise = null;
 
-console.log('YouTube Immersion Mode loaded');
+console.log('Lingo Stream loaded');
 void window.log?.('content.js loaded');
 
 function readSettingsFromStorage() {
@@ -153,7 +153,7 @@ if (document.body) {
     characterData: true,
     subtree: true
   });
-  console.log('YouTube Immersion Mode observer attached to document.body');
+  console.log('Lingo Stream observer attached to document.body');
   handler.primeFromCurrentCaptions();
 } else {
   document.addEventListener(
@@ -164,7 +164,7 @@ if (document.body) {
         characterData: true,
         subtree: true
       });
-      console.log('YouTube Immersion Mode observer attached after DOMContentLoaded');
+      console.log('Lingo Stream observer attached after DOMContentLoaded');
       void window.log?.('MutationObserver attached after DOMContentLoaded');
       handler.primeFromCurrentCaptions();
     },
@@ -210,11 +210,11 @@ function installRealtimeHooks() {
   };
 
   const attachVideoListeners = (video) => {
-    if (!video || video.__immersionHooksInstalled) {
+    if (!video || video.__lingoStreamHooksInstalled) {
       return;
     }
 
-    video.__immersionHooksInstalled = true;
+    video.__lingoStreamHooksInstalled = true;
     video.addEventListener('seeking', forceRefresh, { passive: true });
     video.addEventListener('seeked', forceRefresh, { passive: true });
     video.addEventListener('ratechange', forceRefresh, { passive: true });

@@ -536,7 +536,7 @@ function buildSettings(raw) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'IMMERSION_TRANSLATE_WORDS') {
+  if (message?.type !== 'LINGO_STREAM_TRANSLATE_WORDS') {
     return false;
   }
 

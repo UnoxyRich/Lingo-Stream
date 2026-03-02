@@ -62,7 +62,7 @@ describe('background translation bridge sender validation', () => {
     const { returned, response } = await sendMessage(
       listener,
       {
-        type: 'IMMERSION_TRANSLATE_WORDS',
+        type: 'LINGO_STREAM_TRANSLATE_WORDS',
         payload: {
           words: ['hello'],
           translationProvider: 'mymemory',
@@ -98,7 +98,7 @@ describe('background translation bridge sender validation', () => {
     const { returned, response } = await sendMessage(
       listener,
       {
-        type: 'IMMERSION_TRANSLATE_WORDS',
+        type: 'LINGO_STREAM_TRANSLATE_WORDS',
         payload: {
           words: ['hello']
         }
@@ -136,7 +136,7 @@ describe('background translation bridge sender validation', () => {
     const { returned, response } = await sendMessage(
       listener,
       {
-        type: 'IMMERSION_TRANSLATE_WORDS',
+        type: 'LINGO_STREAM_TRANSLATE_WORDS',
         payload: {
           words: ['hello'],
           translationProvider: 'mymemory',
@@ -177,7 +177,7 @@ describe('background translation provider fallback', () => {
     const { returned, response } = await sendMessage(
       listener,
       {
-        type: 'IMMERSION_TRANSLATE_WORDS',
+        type: 'LINGO_STREAM_TRANSLATE_WORDS',
         payload: {
           words: ['hello'],
           translationProvider: 'google',

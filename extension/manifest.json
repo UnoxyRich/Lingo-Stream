@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Immersion Mode",
+  "name": "Lingo Stream",
   "version": "0.1.0",
   "description": "Replace meaningful subtitle words on YouTube with translated equivalents.",
   "permissions": [

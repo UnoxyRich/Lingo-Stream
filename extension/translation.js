@@ -78,7 +78,7 @@ function requestBackgroundTranslations(words, settings) {
 
     chrome.runtime.sendMessage(
       {
-        type: 'IMMERSION_TRANSLATE_WORDS',
+        type: 'LINGO_STREAM_TRANSLATE_WORDS',
         payload: {
           words,
           translationProvider: settings.translationProvider,

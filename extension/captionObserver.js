@@ -417,7 +417,7 @@ function createCaptionMutationHandler({
     lastKnownRenderConfigKey = renderConfigKey;
 
     if (!enabled) {
-      void window.log?.('Skipped processing: immersion mode disabled');
+      void window.log?.('Skipped processing: Lingo Stream disabled');
       pendingSegments.clear();
       restoreAllSegments();
       isProcessing = false;

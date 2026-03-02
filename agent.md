@@ -1,6 +1,6 @@
 # 🤖 AGENT INSTRUCTIONS
 
-You are assisting in building a Chrome Extension called "YouTube Immersion Mode".
+You are assisting in building a Chrome Extension called "Lingo Stream".
 
 Your responsibilities:
 

@@ -1,4 +1,4 @@
-# 🎧 YouTube Immersion Mode
+# 🎧 Lingo Stream
 
 A Chrome extension that helps users learn a foreign language by replacing a small percentage of YouTube subtitles with translated words.
 
@@ -7,7 +7,7 @@ Example:
 Original:
 "I really enjoy learning new skills every day."
 
-Immersion Mode (Spanish 5%):
+Lingo Stream Output (Spanish 5%):
 "I really enjoy learning new skills (habilidades) every day."
 
 ---

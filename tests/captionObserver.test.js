@@ -157,7 +157,7 @@ describe('caption observer hardening', () => {
     vi.useRealTimers();
   });
 
-  it('skips processing when immersion mode is disabled and restores original text', async () => {
+  it('skips processing when Lingo Stream is disabled and restores original text', async () => {
     vi.useFakeTimers();
 
     let enabled = true;

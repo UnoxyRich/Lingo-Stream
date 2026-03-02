@@ -98,7 +98,7 @@ describe('content bundle loading', () => {
 
     let response = null;
     listener(
-      { type: 'IMMERSION_HEALTH_CHECK' },
+      { type: 'LINGO_STREAM_HEALTH_CHECK' },
       { id: 'test-extension-id' },
       (payload) => {
         response = payload;

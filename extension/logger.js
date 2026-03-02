@@ -50,7 +50,7 @@ async function log(message) {
   await setLocalStorage({ [LOGS_KEY]: nextLogs });
 
   if (debugEnabled) {
-    console.debug(`[YouTube Immersion Mode] ${safeMessage}`);
+    console.debug(`[Lingo Stream] ${safeMessage}`);
   }
 }
 
