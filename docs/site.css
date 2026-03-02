@@ -31,6 +31,7 @@ body {
     radial-gradient(circle at 90% 8%, rgba(10, 95, 118, 0.16), transparent 28%),
     var(--bg);
   min-height: 100vh;
+  scroll-snap-type: y proximity;
 }
 
 .mesh {
@@ -119,6 +120,8 @@ body {
 main {
   width: min(var(--max-width), calc(100% - 28px));
   margin: 24px auto 36px;
+  display: grid;
+  gap: 22px;
 }
 
 .section {
@@ -126,13 +129,19 @@ main {
   border-radius: var(--radius-xl);
   background: var(--panel);
   box-shadow: var(--shadow);
+  min-height: calc(100svh - 112px);
+  padding: clamp(22px, 4.6vw, 56px);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .hero {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 18px;
-  padding: 34px;
+  align-items: center;
 }
 
 .hero-copy h1 {
@@ -242,9 +251,8 @@ main {
   font-size: 12px;
 }
 
-.section:not(.hero) {
-  margin-top: 22px;
-  padding: 24px;
+.section-head {
+  margin-bottom: 8px;
 }
 
 .section-head h2 {
@@ -256,9 +264,9 @@ main {
 .feature-grid,
 .preview-grid,
 .install-grid {
-  margin-top: 14px;
+  margin-top: 18px;
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .feature-grid {
@@ -276,7 +284,7 @@ main {
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 20px;
   background: var(--panel-soft);
 }
 
@@ -321,33 +329,55 @@ code {
   font-weight: 700;
 }
 
-.fake-input {
+.control-input {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 9px;
   background: #f8fbff;
   font-size: 12px;
+  color: var(--text);
+  width: 100%;
 }
 
-.fake-range {
-  height: 8px;
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-range {
+  appearance: none;
+  width: 100%;
+  height: 7px;
   border-radius: 999px;
   background: #d7e8ef;
-  overflow: hidden;
+  outline: none;
 }
 
-.fake-range span {
-  display: block;
-  height: 100%;
-  width: 24%;
+.control-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
   background: linear-gradient(125deg, var(--accent), var(--accent-strong));
+  cursor: pointer;
 }
 
-.popup-field small {
-  display: inline-block;
-  margin-top: 4px;
+.control-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: linear-gradient(125deg, var(--accent), var(--accent-strong));
+  cursor: pointer;
+}
+
+#previewReplacementValue {
   color: var(--accent-strong);
   font-weight: 700;
+  min-width: 40px;
+  text-align: right;
 }
 
 .popup-toggle {
@@ -363,11 +393,11 @@ code {
   font-weight: 700;
 }
 
-.dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: linear-gradient(125deg, var(--accent), var(--accent-strong));
+.popup-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .popup-buttons {
@@ -379,6 +409,13 @@ code {
 .caption {
   margin-top: 10px;
   font-size: 12px;
+}
+
+.preview-meta {
+  margin: 9px 0 0;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .sample-lines {
@@ -403,6 +440,29 @@ code {
   color: var(--accent-strong);
 }
 
+.translated-line {
+  display: inline-block;
+}
+
+.word-pair {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.word-pair .translation {
+  opacity: 0.95;
+}
+
+.translated-line.line-change,
+.subtitle-line.line-change {
+  animation: lineShift 240ms ease;
+}
+
+.translated-line.line-change .word-pair,
+.subtitle-line.line-change .word-pair {
+  animation: wordPulse 360ms ease;
+}
+
 .tag {
   display: inline-block;
   margin-right: 7px;
@@ -415,6 +475,26 @@ code {
 
 .tag-good {
   color: var(--accent-strong);
+}
+
+@keyframes lineShift {
+  0% {
+    opacity: 0.35;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wordPulse {
+  0% {
+    color: #2b4e80;
+  }
+  100% {
+    color: var(--accent-strong);
+  }
 }
 
 ol {
@@ -539,6 +619,10 @@ ol li + li {
     display: none;
   }
 
+  .section {
+    min-height: calc(100svh - 92px);
+  }
+
   .hero {
     grid-template-columns: 1fr;
   }
@@ -570,7 +654,8 @@ ol li + li {
     padding: 22px 14px;
   }
 
-  .section:not(.hero) {
+  .section {
+    min-height: calc(100svh - 76px);
     padding: 18px 14px;
   }
 

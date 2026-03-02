@@ -58,7 +58,7 @@
           <article class="mock-video">
             <div class="window-dots"><span></span><span></span><span></span></div>
             <div class="video-canvas">
-              <div class="subtitle-line">
+              <div id="heroSubtitleLine" class="subtitle-line" aria-live="polite">
                 I really enjoy learning new <strong>skills (habilidades)</strong> every day.
               </div>
             </div>
@@ -100,21 +100,45 @@
               <p>Blend translated words into live captions.</p>
             </header>
             <div class="popup-field">
-              <label>Translation provider</label>
-              <div class="fake-input">Auto fallback (Recommended)</div>
+              <label for="previewProvider">Translation provider</label>
+              <select id="previewProvider" class="control-input">
+                <option value="auto">Auto fallback (Recommended)</option>
+                <option value="google">Google translate endpoint</option>
+                <option value="libre">LibreTranslate public mirrors</option>
+                <option value="apertium">Apertium APY</option>
+                <option value="mymemory">MyMemory</option>
+              </select>
             </div>
             <div class="popup-field">
-              <label>Target language</label>
-              <div class="fake-input">Spanish</div>
+              <label for="previewLanguage">Target language</label>
+              <select id="previewLanguage" class="control-input">
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="pt">Portuguese</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+              </select>
             </div>
             <div class="popup-field">
-              <label>Replacement percentage</label>
-              <div class="fake-range"><span></span></div>
-              <small>5%</small>
+              <label for="previewReplacement">Replacement percentage</label>
+              <div class="range-row">
+                <input
+                  id="previewReplacement"
+                  class="control-range"
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value="35"
+                />
+                <output id="previewReplacementValue" for="previewReplacement">35%</output>
+              </div>
             </div>
             <div class="popup-toggle">
-              <span>Enable Lingo Stream</span>
-              <span class="dot"></span>
+              <label for="previewEnabled">Enable Lingo Stream</label>
+              <input id="previewEnabled" type="checkbox" checked />
             </div>
             <div class="popup-buttons">
               <button type="button" class="btn btn-primary btn-block">Save Settings</button>
@@ -123,17 +147,25 @@
             <p class="caption">Popup UI style preview</p>
           </article>
 
-          <article class="card">
+          <article class="card youtube-change-card">
             <h3>What changes on YouTube</h3>
+            <p class="preview-meta" id="previewMeta">
+              Provider: Auto fallback (Recommended) - Target: Spanish - Replaced words: 1
+            </p>
             <p>
               Captions keep their natural flow, but selected words include translation hints so you
               can absorb vocabulary while still understanding context.
             </p>
             <div class="sample-lines">
-              <p><span class="tag">Original</span> I really enjoy learning new skills every day.</p>
+              <p>
+                <span class="tag">Original</span>
+                <span id="previewOriginalLine">I really enjoy learning new skills every day.</span>
+              </p>
               <p>
                 <span class="tag tag-good">Lingo Stream</span>
-                I really enjoy learning new <strong>skills (habilidades)</strong> every day.
+                <span id="previewTranslatedLine" class="translated-line" aria-live="polite">
+                  I really enjoy learning new <span class="word-pair">skills <span class="translation">(habilidades)</span></span> every day.
+                </span>
               </p>
             </div>
           </article>
