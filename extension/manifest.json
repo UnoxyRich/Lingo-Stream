@@ -23,8 +23,19 @@
   "background": {
     "service_worker": "background.js"
   },
+  "icons": {
+    "16": "logo.svg",
+    "32": "logo.svg",
+    "48": "logo.svg",
+    "128": "logo.svg"
+  },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "logo.svg",
+      "32": "logo.svg",
+      "48": "logo.svg"
+    }
   },
   "content_scripts": [
     {

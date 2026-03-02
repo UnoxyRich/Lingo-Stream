@@ -33,7 +33,25 @@
         <a href="#install">Install</a>
       </nav>
       <a class="btn btn-primary btn-sm" href="#install">Install</a>
+      <div class="topbar-progress" aria-hidden="true">
+        <span id="scrollProgressBar"></span>
+      </div>
     </header>
+
+    <nav class="section-dots" aria-label="Slide navigation">
+      <button type="button" class="section-dot is-active" data-target="hero">
+        <span>Home</span>
+      </button>
+      <button type="button" class="section-dot" data-target="features">
+        <span>Features</span>
+      </button>
+      <button type="button" class="section-dot" data-target="preview">
+        <span>Preview</span>
+      </button>
+      <button type="button" class="section-dot" data-target="install">
+        <span>Install</span>
+      </button>
+    </nav>
 
     <main id="top">
       <section id="hero" class="screen hero-screen">
@@ -50,6 +68,16 @@
               <a class="btn btn-ghost" href="#" data-repo-link target="_blank" rel="noopener noreferrer">
                 View GitHub
               </a>
+            </div>
+            <div class="hero-badges" data-reveal data-delay="240">
+              <article class="badge-card">
+                <strong>Real-Time Injection</strong>
+                <p>Subtitles update instantly without leaving the video.</p>
+              </article>
+              <article class="badge-card">
+                <strong>Adaptive Intensity</strong>
+                <p>Choose how many translated words appear per line.</p>
+              </article>
             </div>
           </div>
           <div class="hero-visual" data-reveal data-delay="260">
@@ -84,6 +112,16 @@
             <article class="feature-item" data-reveal data-delay="200">
               <h3>Fast and Stable</h3>
               <p>Optimized subtitle handling keeps translation output stable while captions update.</p>
+            </article>
+          </div>
+          <div class="feature-strip" data-reveal data-delay="240">
+            <article class="strip-card">
+              <span class="strip-kicker">Workflow</span>
+              <p>Watch video - detect valuable words - inject compact translation - continue watching.</p>
+            </article>
+            <article class="strip-card">
+              <span class="strip-kicker">Learning Loop</span>
+              <p>See recurring vocabulary in context, then lower replacement rate over time.</p>
             </article>
           </div>
         </div>
@@ -142,9 +180,38 @@
               <input id="previewEnabled" type="checkbox" checked />
             </div>
 
-            <div class="preview-buttons" data-reveal data-delay="220">
-              <button type="button" class="btn btn-primary btn-block">Save Settings</button>
-              <button type="button" class="btn btn-ghost btn-block">Refresh Captions</button>
+            <div class="control-row" data-reveal data-delay="220">
+              <label for="previewCustomSentence">Live subtitle sentence</label>
+              <textarea
+                id="previewCustomSentence"
+                class="control-textarea"
+                rows="3"
+                placeholder="Type a sentence and Lingo Stream will enrich it live."
+              >I really enjoy learning new skills every day.</textarea>
+              <div class="phrase-pills" role="group" aria-label="Quick sentence presets">
+                <button type="button" class="pill-btn" data-phrase="I really enjoy learning new skills every day.">
+                  Daily skills
+                </button>
+                <button
+                  type="button"
+                  class="pill-btn"
+                  data-phrase="Watching videos helps me build language confidence quickly."
+                >
+                  Confidence boost
+                </button>
+                <button
+                  type="button"
+                  class="pill-btn"
+                  data-phrase="I practice speaking with friends and review new vocabulary at night."
+                >
+                  Speaking routine
+                </button>
+              </div>
+            </div>
+
+            <div class="preview-buttons" data-reveal data-delay="260">
+              <button type="button" class="btn btn-primary btn-block" data-preview-save>Save Settings</button>
+              <button type="button" class="btn btn-ghost btn-block" data-preview-refresh>Refresh Captions</button>
             </div>
           </div>
 
@@ -152,6 +219,20 @@
             <p id="previewMeta" class="preview-meta">
               Provider: Auto fallback (Recommended) - Target: Spanish - Replaced words: 1
             </p>
+            <div class="preview-insights">
+              <article class="insight-card">
+                <span>Coverage</span>
+                <strong id="previewDensity">20%</strong>
+              </article>
+              <article class="insight-card">
+                <span>Total words</span>
+                <strong id="previewWordCount">8</strong>
+              </article>
+              <article class="insight-card">
+                <span>Status</span>
+                <strong id="previewStatus">Active</strong>
+              </article>
+            </div>
             <div class="subtitle-card">
               <p><span class="tag">Original</span> <span id="previewOriginalLine">I really enjoy learning new skills every day.</span></p>
               <p>

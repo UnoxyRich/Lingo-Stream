@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "sync:logo": "node scripts/sync-logo.js",
     "lint": "eslint extension tests scripts",
     "test": "node --require ./scripts/test-bootstrap.cjs ./node_modules/vitest/vitest.mjs run",
     "test:coverage": "node --require ./scripts/test-bootstrap.cjs ./node_modules/vitest/vitest.mjs run --coverage",
     "validate:manifest": "node scripts/validate-manifest.js",
-    "build": "node scripts/build-check.js",
+    "build": "npm run sync:logo && node scripts/build-check.js",
     "ci": "npm run lint && npm run validate:manifest && npm run test:coverage && npm run build"
   },
   "devDependencies": {

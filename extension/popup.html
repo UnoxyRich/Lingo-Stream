@@ -8,55 +8,99 @@
       :root {
         --bg: #f4f8ff;
         --panel: #ffffff;
-        --panel-border: #d9e3f2;
+        --line: #d9e3f2;
         --text: #1a2438;
         --muted: #61708c;
         --accent: #0f7a7d;
         --accent-strong: #0a5f76;
         --danger: #b63b58;
         --ok: #1d7f4f;
-        --shadow: 0 14px 28px rgba(20, 46, 88, 0.14);
+        --shadow-soft: 0 14px 28px rgba(20, 46, 88, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
         margin: 0;
-        width: 360px;
-        min-width: 360px;
-        font-family: "Avenir Next", "Trebuchet MS", "Segoe UI Variable", sans-serif;
+        width: 372px;
+        min-width: 372px;
         color: var(--text);
+        font-family: "Manrope", "Avenir Next", "Trebuchet MS", sans-serif;
         background:
-          radial-gradient(circle at 10% 20%, rgba(30, 166, 164, 0.16), transparent 45%),
-          radial-gradient(circle at 95% 0%, rgba(10, 95, 118, 0.2), transparent 40%),
+          radial-gradient(circle at 9% 5%, rgba(15, 122, 125, 0.2), transparent 40%),
+          radial-gradient(circle at 96% 0%, rgba(10, 95, 118, 0.18), transparent 42%),
           var(--bg);
       }
 
       main {
-        padding: 14px;
+        padding: 12px;
       }
 
-      .hero {
-        margin-bottom: 12px;
+      .top-card {
+        border: 1px solid rgba(217, 227, 242, 0.94);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: var(--shadow-soft);
+        padding: 12px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand-logo {
+        width: 34px;
+        height: 34px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--accent-strong);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 800;
       }
 
       .hero-title {
-        margin: 0;
-        font-size: 17px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
+        margin: 3px 0 0;
+        font-family: "Sora", "Manrope", sans-serif;
+        font-size: 16px;
+        line-height: 1.2;
       }
 
       .hero-subtitle {
-        margin: 4px 0 0;
-        font-size: 12px;
+        margin: 2px 0 0;
         color: var(--muted);
+        font-size: 11px;
+      }
+
+      .live-pill {
+        border-radius: 999px;
+        border: 1px solid rgba(15, 122, 125, 0.28);
+        background: rgba(15, 122, 125, 0.08);
+        color: var(--accent-strong);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 5px 8px;
       }
 
       .panel {
-        border: 1px solid var(--panel-border);
-        border-radius: 12px;
-        padding: 12px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
+        border: 1px solid rgba(217, 227, 242, 0.86);
+        border-radius: 18px;
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.78);
       }
 
       .field,
@@ -79,14 +123,13 @@
 
       label {
         font-size: 12px;
-        font-weight: 600;
-        color: var(--text);
+        font-weight: 700;
       }
 
       select,
       input[type="range"] {
         width: 100%;
-        border: 1px solid var(--panel-border);
+        border: 1px solid var(--line);
         border-radius: 10px;
         padding: 8px 10px;
         background: #f8fbff;
@@ -96,12 +139,42 @@
 
       input[type="range"] {
         padding: 0;
+        appearance: none;
+        height: 8px;
+        border-radius: 999px;
+        background: #d7e8ef;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        border: 2px solid #fff;
+        background: linear-gradient(125deg, var(--accent), var(--accent-strong));
+        cursor: pointer;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        border: 2px solid #fff;
+        background: linear-gradient(125deg, var(--accent), var(--accent-strong));
+        cursor: pointer;
+      }
+
+      .hint {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.45;
+        font-size: 11px;
       }
 
       .range-row {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
       }
 
       #replacementPercentage {
@@ -109,29 +182,31 @@
       }
 
       #replacementPercentageValue {
-        min-width: 36px;
-        font-size: 12px;
-        font-weight: 700;
+        min-width: 38px;
+        text-align: right;
         color: var(--accent-strong);
+        font-size: 12px;
+        font-weight: 800;
       }
 
       .switch-row {
-        padding: 8px 10px;
-        border: 1px solid var(--panel-border);
+        border: 1px solid var(--line);
         border-radius: 10px;
         background: #f8fbff;
+        padding: 8px 10px;
       }
 
       input[type="checkbox"] {
-        width: 17px;
-        height: 17px;
+        width: 18px;
+        height: 18px;
         accent-color: var(--accent);
+        cursor: pointer;
       }
 
       .button-row {
         display: flex;
-        gap: 8px;
-        margin-top: 4px;
+        gap: 9px;
+        margin-top: 3px;
       }
 
       button {
@@ -139,32 +214,35 @@
         border-radius: 10px;
         padding: 9px 12px;
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         letter-spacing: 0.01em;
         cursor: pointer;
-        transition: background-color 120ms ease, transform 120ms ease;
+        transition: transform 130ms ease, filter 130ms ease;
       }
 
       button:hover {
         transform: translateY(-1px);
+        filter: saturate(1.05);
       }
 
       button:disabled {
         opacity: 0.65;
         cursor: not-allowed;
         transform: none;
+        filter: none;
       }
 
       #saveButton {
         flex: 1;
-        color: #ffffff;
-        background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+        color: #fff;
+        background: linear-gradient(125deg, var(--accent), var(--accent-strong));
       }
 
       #attachButton {
         flex: 1;
         color: var(--accent-strong);
-        background: #e7f4f7;
+        border: 1px solid rgba(15, 122, 125, 0.3);
+        background: rgba(15, 122, 125, 0.08);
       }
 
       .status {
@@ -182,25 +260,18 @@
         color: var(--ok);
       }
 
-      .hint {
-        margin: 0;
-        font-size: 12px;
-        color: var(--muted);
-      }
-
       details {
         margin-top: 12px;
-        border: 1px solid var(--panel-border);
-        border-radius: 10px;
-        background: #f9fbff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(248, 251, 255, 0.84);
       }
 
       summary {
         padding: 10px 12px;
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         cursor: pointer;
-        user-select: none;
       }
 
       .debug-content {
@@ -217,17 +288,18 @@
       #clearLogsButton {
         width: 100%;
         margin-bottom: 8px;
-        color: #5a5f73;
-        background: #edf2fa;
+        color: var(--accent-strong);
+        border: 1px solid rgba(15, 122, 125, 0.3);
+        background: rgba(15, 122, 125, 0.08);
       }
 
       #logPanel {
-        border: 1px solid var(--panel-border);
+        border: 1px solid var(--line);
         border-radius: 8px;
         padding: 8px;
-        height: 140px;
+        height: 136px;
         overflow-y: auto;
-        font-family: monospace;
+        font-family: "Consolas", "JetBrains Mono", monospace;
         font-size: 12px;
         white-space: pre-wrap;
         background: #f2f6fd;
@@ -247,9 +319,16 @@
   </head>
   <body>
     <main>
-      <header class="hero">
-        <h1 class="hero-title">Lingo Stream</h1>
-        <p class="hero-subtitle">Blend translated words into live captions.</p>
+      <header class="top-card">
+        <div class="brand">
+          <img class="brand-logo" src="logo.svg" alt="Lingo Stream logo" />
+          <div>
+            <p class="eyebrow">Chrome Extension</p>
+            <h1 class="hero-title">Lingo Stream</h1>
+            <p class="hero-subtitle">Blend translated words into live captions.</p>
+          </div>
+        </div>
+        <span class="live-pill">Live</span>
       </header>
 
       <section class="panel">
@@ -306,13 +385,11 @@
               <label for="debugEnabled">Enable debug mode</label>
               <input id="debugEnabled" name="debugEnabled" type="checkbox" />
             </div>
-
             <button id="clearLogsButton" type="button">Clear Logs</button>
             <div id="logPanel" aria-live="polite">Live logs appear here.</div>
           </div>
         </details>
       </section>
-
     </main>
 
     <script src="popup.js"></script>
