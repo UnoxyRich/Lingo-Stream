@@ -3,192 +3,243 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 globalThis.window = globalThis;
 await import('../extension/translation.js');
 
-describe('translation layer', () => {
-  beforeEach(() => {
-    Object.keys(window.translationCache).forEach((key) => delete window.translationCache[key]);
-
-    global.chrome = {
-      storage: {
-        sync: {
-          get: vi.fn((_keys, callback) => {
-            callback({
-              translationProvider: 'libre',
-              targetLanguage: 'es',
-              sourceLanguage: 'en',
-              translationEndpoint: 'https://translate.cutie.dating/translate',
-              translationTimeoutMs: 20
-            });
-          })
-        }
+function createChromeMock({ storageItems = {}, response = null, runtimeErrorMessage = '' } = {}) {
+  return {
+    storage: {
+      sync: {
+        get: vi.fn((_keys, callback) => {
+          callback(storageItems);
+        })
       }
-    };
+    },
+    runtime: {
+      lastError: null,
+      sendMessage: vi.fn((_message, callback) => {
+        if (runtimeErrorMessage) {
+          globalThis.chrome.runtime.lastError = { message: runtimeErrorMessage };
+          callback(undefined);
+          globalThis.chrome.runtime.lastError = null;
+          return;
+        }
 
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+        callback(response);
+      })
+    }
+  };
+}
+
+function resetTranslationCaches() {
+  Object.keys(window.translationCache).forEach((key) => delete window.translationCache[key]);
+  Object.keys(window.translationMissCache).forEach((key) => delete window.translationMissCache[key]);
+}
+
+describe('translation bridge layer', () => {
+  beforeEach(() => {
+    resetTranslationCaches();
+    globalThis.chrome = createChromeMock();
   });
 
-  it('uses batch fetch and caches translation results for libre provider', async () => {
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => [{ translatedText: 'hola' }, { translatedText: 'mundo' }]
-    }));
+  it('sends only missing words to the runtime bridge and caches successful translations', async () => {
+    globalThis.chrome = createChromeMock({
+      storageItems: {
+        translationProvider: 'auto',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        translationEndpoint: '',
+        translationTimeoutMs: 1200
+      },
+      response: {
+        ok: true,
+        translations: {
+          hello: 'hola',
+          world: 'mundo'
+        },
+        meta: {
+          providerByWord: {
+            hello: 'libre',
+            world: 'mymemory'
+          },
+          failedProvidersByWord: {}
+        }
+      }
+    });
 
     const first = await window.translateWords(['Hello', 'World']);
     const second = await window.translateWords(['hello']);
 
-    expect(first.hello).toBe('hola');
-    expect(first.world).toBe('mundo');
-    expect(second.hello).toBe('hola');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(first).toEqual({ hello: 'hola', world: 'mundo' });
+    expect(second).toEqual({ hello: 'hola' });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to lingva when libre endpoint is unavailable', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) });
+  it('deduplicates repeated words in a single batch before sending to runtime', async () => {
+    globalThis.chrome = createChromeMock({
+      response: {
+        ok: true,
+        translations: {
+          hello: 'hola'
+        },
+        meta: {
+          providerByWord: { hello: 'libre' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
+
+    await window.translateWords(['Hello', 'hello', 'HELLO']);
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
+    const sentWords = globalThis.chrome.runtime.sendMessage.mock.calls[0][0].payload.words;
+    expect(sentWords).toEqual(['Hello']);
+  });
+
+  it('returns null from translateWord when runtime bridge reports no translation', async () => {
+    globalThis.chrome = createChromeMock({
+      response: {
+        ok: true,
+        translations: {},
+        meta: {
+          providerByWord: {},
+          failedProvidersByWord: { hello: ['libre', 'mymemory'] }
+        }
+      }
+    });
+
+    const translated = await window.translateWord('hello');
+    expect(translated).toBeNull();
+  });
+
+  it('treats invalid bridge responses as misses and avoids immediate retries', async () => {
+    globalThis.chrome = createChromeMock({
+      response: {
+        ok: false,
+        error: 'provider_down'
+      }
+    });
+
+    const first = await window.translateWords(['hello']);
+    const second = await window.translateWords(['hello']);
+
+    expect(first).toEqual({});
+    expect(second).toEqual({});
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores empty translated values while keeping valid translations', async () => {
+    globalThis.chrome = createChromeMock({
+      response: {
+        ok: true,
+        translations: {
+          hello: '   ',
+          world: 'mundo'
+        },
+        meta: {
+          providerByWord: { world: 'libre' },
+          failedProvidersByWord: { hello: ['libre', 'mymemory'] }
+        }
+      }
+    });
+
+    const translated = await window.translateWords(['hello', 'world']);
+
+    expect(translated).toEqual({ world: 'mundo' });
+    expect(window.translationMissCache.hello).toBeTypeOf('number');
+  });
+
+  it('gracefully handles missing runtime messaging API', async () => {
+    globalThis.chrome = {
+      storage: {
+        sync: {
+          get: vi.fn((_keys, callback) => callback({}))
+        }
+      }
+    };
+
+    const result = await window.translateWords(['hello']);
+    expect(result).toEqual({});
+  });
+
+  it('retries a word after its miss-cache entry expires', async () => {
+    window.translationMissCache.hello = Date.now() - (4 * 60 * 1000);
+
+    globalThis.chrome = createChromeMock({
+      response: {
+        ok: true,
+        translations: { hello: 'hola' },
+        meta: {
+          providerByWord: { hello: 'libre' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
 
     const result = await window.translateWords(['hello']);
 
     expect(result).toEqual({ hello: 'hola' });
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(global.fetch.mock.calls[1][0]).toContain('https://lingva.ml/api/v1/en/es/hello');
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
   });
 
-  it('uses lingva provider directly when selected', async () => {
-    global.chrome.storage.sync.get = vi.fn((_keys, callback) => {
-      callback({
-        translationProvider: 'lingva',
+  it('miss-caches failed words to avoid immediate bridge retries', async () => {
+    globalThis.chrome = createChromeMock({
+      runtimeErrorMessage: 'bridge unavailable'
+    });
+
+    const first = await window.translateWords(['hello']);
+    const second = await window.translateWords(['hello']);
+
+    expect(first).toEqual({});
+    expect(second).toEqual({});
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses defaults when translation settings are absent in storage', async () => {
+    globalThis.chrome = createChromeMock({
+      storageItems: {},
+      response: {
+        ok: true,
+        translations: { hello: 'hola' },
+        meta: {
+          providerByWord: { hello: 'libre' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
+
+    await window.translateWords(['hello']);
+
+    const payload = globalThis.chrome.runtime.sendMessage.mock.calls[0][0].payload;
+    expect(payload.translationProvider).toBe('auto');
+    expect(payload.sourceLanguage).toBe('en');
+    expect(payload.targetLanguage).toBe('es');
+    expect(payload.translationTimeoutMs).toBe(1200);
+  });
+
+  it('forwards configured provider and language settings from storage to the bridge', async () => {
+    globalThis.chrome = createChromeMock({
+      storageItems: {
+        translationProvider: 'apertium',
+        sourceLanguage: 'en',
         targetLanguage: 'fr',
-        sourceLanguage: 'en',
-        translationEndpoint: 'https://lingva.ml/api/v1',
-        translationTimeoutMs: 20
-      });
+        translationEndpoint: 'https://apertium.org/apy/translate',
+        translationTimeoutMs: 1500
+      },
+      response: {
+        ok: true,
+        translations: { hello: 'bonjour' },
+        meta: {
+          providerByWord: { hello: 'apertium' },
+          failedProvidersByWord: {}
+        }
+      }
     });
 
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ translation: 'bonjour' })
-    }));
+    await window.translateWords(['hello']);
 
-    const result = await window.translateWord('hello');
-
-    expect(result).toBe('bonjour');
-    expect(global.fetch.mock.calls[0][0]).toContain('https://lingva.ml/api/v1/en/fr/hello');
+    const payload = globalThis.chrome.runtime.sendMessage.mock.calls[0][0].payload;
+    expect(payload.translationProvider).toBe('apertium');
+    expect(payload.sourceLanguage).toBe('en');
+    expect(payload.targetLanguage).toBe('fr');
+    expect(payload.translationEndpoint).toBe('https://apertium.org/apy/translate');
+    expect(payload.translationTimeoutMs).toBe(1500);
   });
-
-  it('falls back to the alternate provider when batch response is invalid', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ invalid: true }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'mundo' }) });
-
-    const result = await window.translateWords(['hello', 'world']);
-
-    expect(result).toEqual({ hello: 'hola', world: 'mundo' });
-    expect(global.fetch).toHaveBeenCalledTimes(3);
-  });
-
-  it('handles timeout simulation', async () => {
-    global.fetch = vi.fn((_url, options) =>
-      new Promise((_, reject) => {
-        options.signal.addEventListener('abort', () => {
-          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-        });
-      })
-    );
-
-    const result = await window.translateWord('timeout');
-    expect(result).toBeNull();
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('returns null for invalid response structure', async () => {
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ translated: 'bad' }) }));
-
-    const result = await window.translateWord('shape');
-    expect(result).toBeNull();
-  });
-
-  it('returns cached value without network calls', async () => {
-    window.translationCache.hello = 'hola';
-    global.fetch = vi.fn();
-
-    const result = await window.translateWords(['hello']);
-    expect(result).toEqual({ hello: 'hola' });
-    expect(global.fetch).toHaveBeenCalledTimes(0);
-  });
-
-  it('handles provider defaults when storage is empty', async () => {
-    global.chrome.storage.sync.get = vi.fn((_keys, callback) => callback({}));
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ translatedText: 'hola' }) }));
-
-    const result = await window.translateWord('hello');
-    expect(result).toBe('hola');
-    expect(global.fetch.mock.calls[0][0]).toBe('https://translate.cutie.dating/translate');
-  });
-
-  it('falls back to single-word loop when batch throws non-timeout error', async () => {
-    global.fetch = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ translatedText: 'hola' }) });
-
-    const result = await window.translateWords(['hello']);
-    expect(result).toEqual({ hello: 'hola' });
-  });
-
-
-  it('returns empty result when fallback provider times out', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
-      .mockRejectedValueOnce(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-
-    const result = await window.translateWords(['hello']);
-    expect(result).toEqual({});
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('handles non-timeout errors during single-word fallback loop', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('hard failure'));
-
-    const result = await window.translateWords(['hello']);
-    expect(result).toEqual({});
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-
-  it('logs libre rate limit branch and falls back successfully', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ translation: 'hola' }) });
-
-    const result = await window.translateWords(['hello']);
-    expect(result).toEqual({ hello: 'hola' });
-    expect(console.warn).toHaveBeenCalled();
-  });
-
-  it('logs lingva rate limit branch and falls back to libre', async () => {
-    global.chrome.storage.sync.get = vi.fn((_keys, callback) => {
-      callback({
-        translationProvider: 'lingva',
-        targetLanguage: 'es',
-        sourceLanguage: 'en',
-        translationEndpoint: 'https://lingva.ml/api/v1',
-        translationTimeoutMs: 20
-      });
-    });
-
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ translatedText: 'hola' }) });
-
-    const result = await window.translateWords(['hello']);
-    expect(result).toEqual({ hello: 'hola' });
-    expect(console.warn).toHaveBeenCalled();
-  });
-
 });

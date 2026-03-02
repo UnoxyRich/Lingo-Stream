@@ -1,4 +1,12 @@
 import { defineConfig } from 'vitest/config';
+import { webcrypto } from 'node:crypto';
+
+if ((!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== 'function') && webcrypto) {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: webcrypto,
+    configurable: true
+  });
+}
 
 export default defineConfig({
   test: {

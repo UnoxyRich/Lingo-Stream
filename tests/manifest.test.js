@@ -22,7 +22,15 @@ describe('manifest validation', () => {
 
   it('includes translation host permission and popup action', () => {
     expect(manifest.host_permissions).toEqual(expect.arrayContaining(['https://www.youtube.com/*']));
-    expect(manifest.host_permissions.some((host) => host.includes('translate.cutie.dating') || host.includes('lingva.ml'))).toBe(true);
+    expect(
+      manifest.host_permissions.some(
+        (host) =>
+          host.includes('libretranslate.com') ||
+          host.includes('argosopentech.com') ||
+          host.includes('apertium.org') ||
+          host.includes('mymemory.translated.net')
+      )
+    ).toBe(true);
     expect(manifest.action?.default_popup).toBe('popup.html');
   });
 });

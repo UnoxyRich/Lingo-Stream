@@ -29,7 +29,11 @@ if (!hasYouTubeContentScript) {
 const hostPermissions = manifest.host_permissions || [];
 const hasYouTubeHost = hostPermissions.includes('https://www.youtube.com/*');
 const hasFreeTranslationHost = hostPermissions.some(
-  (host) => host.includes('translate.cutie.dating') || host.includes('lingva.ml')
+  (host) =>
+    host.includes('libretranslate.com') ||
+    host.includes('argosopentech.com') ||
+    host.includes('apertium.org') ||
+    host.includes('mymemory.translated.net')
 );
 
 if (!hasYouTubeHost) {

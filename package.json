@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "lint": "eslint extension tests scripts",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "node --require ./scripts/test-bootstrap.cjs ./node_modules/vitest/vitest.mjs run",
+    "test:coverage": "node --require ./scripts/test-bootstrap.cjs ./node_modules/vitest/vitest.mjs run --coverage",
     "validate:manifest": "node scripts/validate-manifest.js",
     "build": "node scripts/build-check.js",
     "ci": "npm run lint && npm run validate:manifest && npm run test:coverage && npm run build"

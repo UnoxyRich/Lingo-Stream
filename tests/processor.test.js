@@ -37,6 +37,21 @@ describe('percentage replacement logic', () => {
     expect(output).toBe('hello world');
   });
 
+  it('accepts numeric-string replacement percentage values', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const translateWordsMock = vi.fn(async () => ({ enjoy: 'gusto' }));
+
+    const output = await window.buildImmersiveSubtitle(
+      'I enjoy coding daily',
+      translateWordsMock,
+      '50'
+    );
+
+    expect(output).toContain('enjoy (gusto)');
+    expect(translateWordsMock).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
+
   it('builds subtitle with translated suffix format from batched translations', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const translateWordsMock = vi.fn(async (words) => {
@@ -57,5 +72,76 @@ describe('percentage replacement logic', () => {
     expect(translateWordsMock).toHaveBeenCalledTimes(1);
     expect(output).toContain('enjoy (enjoy-es)');
     vi.restoreAllMocks();
+  });
+
+  it('keeps pinned translations even when no new random picks are needed', async () => {
+    const translateWordsMock = vi.fn(async () => ({}));
+
+    const output = await window.buildImmersiveSubtitle(
+      'I enjoy learning skills',
+      translateWordsMock,
+      25,
+      { enjoy: 'gusto' }
+    );
+
+    expect(output).toContain('enjoy (gusto)');
+    expect(translateWordsMock).toHaveBeenCalledTimes(0);
+  });
+
+  it('does not append duplicate inline translation suffixes', async () => {
+    const translateWordsMock = vi.fn(async () => ({}));
+
+    const output = await window.buildImmersiveSubtitle(
+      'apple(apple-zh)(apple-zh)',
+      translateWordsMock,
+      25,
+      { apple: 'apple-zh' }
+    );
+
+    expect(output).toBe('apple(apple-zh)');
+    expect(translateWordsMock).toHaveBeenCalledTimes(0);
+  });
+
+  it('translates only one occurrence when the same word repeats in a sentence', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const translateWordsMock = vi.fn(async () => ({ apple: 'apple-zh' }));
+
+    const output = await window.buildImmersiveSubtitle(
+      'apple apple apple',
+      translateWordsMock,
+      100
+    );
+
+    expect(output).toBe('apple (apple-zh) apple apple');
+    expect(translateWordsMock).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
+
+  it('keeps inline translation text and removes duplicate inline suffixes', async () => {
+    const translateWordsMock = vi.fn(async () => ({ apple: 'otra' }));
+
+    const output = await window.buildImmersiveSubtitle(
+      'apple (manzana) (manzana)',
+      translateWordsMock,
+      100
+    );
+
+    expect(output).toBe('apple (manzana)');
+    expect(translateWordsMock).toHaveBeenCalledTimes(0);
+  });
+
+  it('supports pinned translations provided as a Map', async () => {
+    const translateWordsMock = vi.fn(async () => ({}));
+    const pinned = new Map([['ENJOY', 'gusto']]);
+
+    const output = await window.buildImmersiveSubtitle(
+      'I enjoy coding',
+      translateWordsMock,
+      25,
+      pinned
+    );
+
+    expect(output).toContain('enjoy (gusto)');
+    expect(translateWordsMock).toHaveBeenCalledTimes(0);
   });
 });

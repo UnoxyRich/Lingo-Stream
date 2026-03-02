@@ -1,8 +1,9 @@
 const cache = {};
 const missCache = {};
 
-const DEFAULT_TIMEOUT_MS = 2500;
-const MISS_CACHE_TTL_MS = 3 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 1200;
+const MISS_CACHE_TTL_MS = 30 * 1000;
+const BRIDGE_FAILURE_BACKOFF_MS = 1500;
 
 function getFromStorage(keys) {
   return new Promise((resolve) => {
@@ -39,6 +40,12 @@ function isMissCached(normalized, now = Date.now()) {
   return true;
 }
 
+function markMissCached(normalized, now = Date.now(), ttlMs = MISS_CACHE_TTL_MS) {
+  const clampedTtlMs = Math.max(0, Math.min(MISS_CACHE_TTL_MS, Number(ttlMs) || 0));
+  // Encode shorter TTLs with the same timestamp-only cache format.
+  missCache[normalized] = now - MISS_CACHE_TTL_MS + clampedTtlMs;
+}
+
 async function getTranslationSettings() {
   const settings = await getFromStorage([
     'translationProvider',
@@ -63,6 +70,12 @@ async function getTranslationSettings() {
 
 function requestBackgroundTranslations(words, settings) {
   return new Promise((resolve) => {
+    if (typeof chrome?.runtime?.sendMessage !== 'function') {
+      void window.log?.('Translation bridge unavailable: chrome.runtime.sendMessage not found');
+      resolve(null);
+      return;
+    }
+
     chrome.runtime.sendMessage(
       {
         type: 'IMMERSION_TRANSLATE_WORDS',
@@ -130,7 +143,7 @@ async function translateWords(words) {
     void window.log?.('Translation batch failed in background bridge');
 
     for (const word of misses) {
-      missCache[word.toLowerCase()] = now;
+      markMissCached(word.toLowerCase(), now, BRIDGE_FAILURE_BACKOFF_MS);
     }
 
     return translations;
@@ -157,7 +170,7 @@ async function translateWords(words) {
   for (const word of misses) {
     const normalized = word.toLowerCase();
     if (!translations[normalized]) {
-      missCache[normalized] = now;
+      markMissCached(normalized, now);
       const failedProviders = fetched.meta?.failedProvidersByWord?.[normalized];
       if (Array.isArray(failedProviders) && failedProviders.length > 0) {
         void window.log?.(`Translation unavailable (${failedProviders.join('>')}): ${word}`);

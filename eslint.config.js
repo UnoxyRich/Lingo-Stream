@@ -1,3 +1,7 @@
+if (typeof globalThis.structuredClone !== 'function') {
+  globalThis.structuredClone = (value) => JSON.parse(JSON.stringify(value));
+}
+
 export default [
   {
     files: ['**/*.js'],

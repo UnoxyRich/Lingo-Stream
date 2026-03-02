@@ -1,11 +1,14 @@
-const DEFAULT_TIMEOUT_MS = 2500;
+const DEFAULT_TIMEOUT_MS = 1200;
+const DEBUG_LOGS_KEY = 'debugLogs';
+const MAX_LOG_ENTRIES = 200;
 const PROVIDERS = {
   AUTO: 'auto',
   LIBRE: 'libre',
   MYMEMORY: 'mymemory',
-  APERTIUM: 'apertium'
+  APERTIUM: 'apertium',
+  GOOGLE: 'google'
 };
-const AUTO_PROVIDER_ORDER = [PROVIDERS.LIBRE, PROVIDERS.MYMEMORY, PROVIDERS.APERTIUM];
+const AUTO_PROVIDER_ORDER = [PROVIDERS.GOOGLE, PROVIDERS.MYMEMORY, PROVIDERS.APERTIUM, PROVIDERS.LIBRE];
 
 const LIBRE_ENDPOINTS = [
   'https://libretranslate.com/translate',
@@ -16,6 +19,7 @@ const APERTIUM_ENDPOINTS = [
   'https://beta.apertium.org/apy/translate'
 ];
 const MYMEMORY_ENDPOINT = 'https://api.mymemory.translated.net/get';
+const GOOGLE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single';
 
 const ALLOWED_LIBRE_ORIGINS = new Set([
   'https://libretranslate.com',
@@ -37,14 +41,72 @@ const APERTIUM_CODE_MAP = {
   ko: 'kor'
 };
 
-function isYouTubeSender(sender) {
-  try {
-    const url = new URL(sender?.url ?? '');
-    const hostname = url.hostname.toLowerCase();
-    return hostname === 'youtube.com' || hostname.endsWith('.youtube.com');
-  } catch {
+function hasLocalStorageApi() {
+  return typeof chrome !== 'undefined' && Boolean(chrome.storage?.local);
+}
+
+function formatTimestamp(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function appendDebugLog(message) {
+  if (!hasLocalStorageApi()) {
+    return;
+  }
+
+  chrome.storage.local.get([DEBUG_LOGS_KEY], (items) => {
+    const existing = Array.isArray(items?.[DEBUG_LOGS_KEY]) ? items[DEBUG_LOGS_KEY] : [];
+    const entry = `[${formatTimestamp()}] ${message}`;
+    const next = [...existing, entry].slice(-MAX_LOG_ENTRIES);
+    chrome.storage.local.set({ [DEBUG_LOGS_KEY]: next });
+  });
+}
+
+function isYouTubeHostname(hostname) {
+  if (typeof hostname !== 'string' || !hostname) {
     return false;
   }
+
+  const normalized = hostname.toLowerCase();
+  return normalized === 'youtube.com' || normalized.endsWith('.youtube.com');
+}
+
+function extractSenderHostnames(sender) {
+  const hostnames = [];
+  const candidateUrls = [
+    sender?.url,
+    sender?.origin,
+    sender?.tab?.url,
+    sender?.documentUrl
+  ];
+
+  for (const candidate of candidateUrls) {
+    if (typeof candidate !== 'string' || !candidate) {
+      continue;
+    }
+
+    try {
+      const hostname = new URL(candidate).hostname;
+      if (hostname) {
+        hostnames.push(hostname);
+      }
+    } catch {
+      // Ignore malformed sender URL values.
+    }
+  }
+
+  return hostnames;
+}
+
+function isYouTubeSender(sender) {
+  const hostnames = extractSenderHostnames(sender);
+  return hostnames.some((hostname) => isYouTubeHostname(hostname));
+}
+
+function isTrustedInternalSender(sender) {
+  const runtimeId = chrome?.runtime?.id;
+  return Boolean(runtimeId) && sender?.id === runtimeId;
 }
 
 function normalizeLanguageCode(code, fallback) {
@@ -61,7 +123,12 @@ function normalizeLanguageCode(code, fallback) {
 }
 
 function normalizeProvider(provider) {
-  if (provider === PROVIDERS.LIBRE || provider === PROVIDERS.MYMEMORY || provider === PROVIDERS.APERTIUM) {
+  if (
+    provider === PROVIDERS.LIBRE ||
+    provider === PROVIDERS.MYMEMORY ||
+    provider === PROVIDERS.APERTIUM ||
+    provider === PROVIDERS.GOOGLE
+  ) {
     return provider;
   }
 
@@ -294,6 +361,51 @@ async function requestMyMemoryWord(word, settings) {
   return normalizeTranslationCandidate(word, payload?.responseData?.translatedText);
 }
 
+function parseGoogleTranslateText(payload) {
+  if (!Array.isArray(payload) || !Array.isArray(payload[0])) {
+    return null;
+  }
+
+  const parts = [];
+  for (const segment of payload[0]) {
+    if (!Array.isArray(segment) || typeof segment[0] !== 'string') {
+      continue;
+    }
+    parts.push(segment[0]);
+  }
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+async function requestGoogleWord(word, settings) {
+  const url = new URL(GOOGLE_ENDPOINT);
+  url.searchParams.set('client', 'gtx');
+  url.searchParams.set('sl', settings.sourceLanguage);
+  url.searchParams.set('tl', settings.targetLanguage);
+  url.searchParams.set('dt', 't');
+  url.searchParams.set('q', word);
+
+  const response = await fetchWithTimeout(
+    url.toString(),
+    {
+      method: 'GET'
+    },
+    settings.translationTimeoutMs
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  const translated = parseGoogleTranslateText(payload);
+  return normalizeTranslationCandidate(word, translated);
+}
+
 async function requestWordWithProvider(provider, word, settings) {
   if (provider === PROVIDERS.LIBRE) {
     return requestLibreWord(word, settings);
@@ -307,7 +419,45 @@ async function requestWordWithProvider(provider, word, settings) {
     return requestApertiumWord(word, settings);
   }
 
+  if (provider === PROVIDERS.GOOGLE) {
+    return requestGoogleWord(word, settings);
+  }
+
   return null;
+}
+
+async function requestWordAuto(word, settings, providerOrder) {
+  const failedProviders = [];
+
+  const attempts = providerOrder.map((provider) =>
+    (async () => {
+      try {
+        const translated = await requestWordWithProvider(provider, word, settings);
+        if (!translated) {
+          throw new Error(`provider_unavailable:${provider}`);
+        }
+
+        return { translated, provider };
+      } catch (error) {
+        failedProviders.push(provider);
+        throw error;
+      }
+    })()
+  );
+
+  try {
+    const resolved = await Promise.any(attempts);
+    return {
+      ...resolved,
+      failedProviders: Array.from(new Set(failedProviders))
+    };
+  } catch {
+    return {
+      translated: null,
+      provider: null,
+      failedProviders: Array.from(new Set(failedProviders))
+    };
+  }
 }
 
 async function translateWords(words, settings) {
@@ -318,6 +468,19 @@ async function translateWords(words, settings) {
 
   for (const word of words) {
     const normalized = word.toLowerCase();
+
+    if (settings.translationProvider === PROVIDERS.AUTO) {
+      const autoResult = await requestWordAuto(word, settings, providerOrder);
+      if (autoResult.translated && autoResult.provider) {
+        translations[normalized] = autoResult.translated;
+        providerByWord[normalized] = autoResult.provider;
+      } else if (autoResult.failedProviders.length > 0) {
+        failedProvidersByWord[normalized] = autoResult.failedProviders;
+      }
+
+      continue;
+    }
+
     const failedProviders = [];
 
     for (const provider of providerOrder) {
@@ -377,22 +540,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  if (!isYouTubeSender(sender)) {
+  if (!isYouTubeSender(sender) && !isTrustedInternalSender(sender)) {
+    appendDebugLog('Translation bridge rejected request: unauthorized sender');
     sendResponse({ ok: false, error: 'unauthorized_sender' });
     return false;
   }
 
   const words = sanitizeWords(message?.payload?.words);
   const settings = buildSettings(message?.payload);
+  appendDebugLog(
+    `Translation request accepted: words=${words.length}, provider=${settings.translationProvider}, target=${settings.targetLanguage}`
+  );
 
   void (async () => {
     try {
       const result = await translateWords(words, settings);
+      appendDebugLog(
+        `Translation request completed: translated=${Object.keys(result.translations).length}, words=${words.length}`
+      );
       sendResponse({ ok: true, ...result });
     } catch (error) {
+      appendDebugLog(`Translation request failed: ${String(error)}`);
       sendResponse({ ok: false, error: String(error) });
     }
   })();
 
   return true;
 });
+
+appendDebugLog('background.js loaded');
