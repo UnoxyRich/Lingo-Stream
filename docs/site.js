@@ -517,6 +517,14 @@ function attachRepositoryLinks(repositoryUrl) {
   }
 }
 
+function attachReleaseLinks(repositoryUrl) {
+  const releasesUrl = `${repositoryUrl}/releases`;
+  const linkNodes = document.querySelectorAll('[data-releases-link]');
+  for (const linkNode of linkNodes) {
+    linkNode.href = releasesUrl;
+  }
+}
+
 function attachRevealAnimation() {
   const revealNodes = document.querySelectorAll('[data-reveal]');
   if (revealNodes.length === 0) {
@@ -1310,6 +1318,7 @@ function updateCopyrightYear() {
 function initializeSite() {
   const repositoryUrl = inferRepositoryUrl();
   attachRepositoryLinks(repositoryUrl);
+  attachReleaseLinks(repositoryUrl);
   attachRevealAnimation();
   attachTopbarContraction();
   attachFloatingPlusField();
