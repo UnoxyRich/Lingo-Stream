@@ -270,6 +270,30 @@ function collectVocabularyEntries({ uniqueWords, translations, settings, provide
   return entries;
 }
 
+function finalizeTranslationBatch({ uniqueWords, translations, settings, providerByWord }) {
+  const successCount = Object.keys(translations).length;
+  if (successCount > 0) {
+    void persistTranslationHealth({
+      successCount,
+      providerByWord
+    });
+  }
+
+  if (!settings?.saveVocabulary) {
+    return;
+  }
+
+  const vocabularyEntries = collectVocabularyEntries({
+    uniqueWords,
+    translations,
+    settings,
+    providerByWord
+  });
+  if (vocabularyEntries.length > 0) {
+    void queueVocabularyPersistence(vocabularyEntries);
+  }
+}
+
 function requestBackgroundTranslations(words, settings) {
   return new Promise((resolve) => {
     if (typeof chrome?.runtime?.sendMessage !== 'function') {
@@ -336,25 +360,12 @@ async function translateWords(words) {
   const settings = await getTranslationSettings();
 
   if (misses.length === 0) {
-    const successCount = Object.keys(translations).length;
-    if (successCount > 0) {
-      void persistTranslationHealth({
-        successCount,
-        providerByWord
-      });
-    }
-
-    if (settings.saveVocabulary) {
-      const vocabularyEntries = collectVocabularyEntries({
-        uniqueWords,
-        translations,
-        settings,
-        providerByWord
-      });
-      if (vocabularyEntries.length > 0) {
-        void queueVocabularyPersistence(vocabularyEntries);
-      }
-    }
+    finalizeTranslationBatch({
+      uniqueWords,
+      translations,
+      settings,
+      providerByWord
+    });
 
     return translations;
   }
@@ -370,6 +381,13 @@ async function translateWords(words) {
     for (const word of misses) {
       markMissCached(word.toLowerCase(), now, BRIDGE_FAILURE_BACKOFF_MS);
     }
+
+    finalizeTranslationBatch({
+      uniqueWords,
+      translations,
+      settings,
+      providerByWord
+    });
 
     return translations;
   }
@@ -407,25 +425,12 @@ async function translateWords(words) {
     }
   }
 
-  const successCount = Object.keys(translations).length;
-  if (successCount > 0) {
-    void persistTranslationHealth({
-      successCount,
-      providerByWord
-    });
-  }
-
-  if (settings.saveVocabulary) {
-    const vocabularyEntries = collectVocabularyEntries({
-      uniqueWords,
-      translations,
-      settings,
-      providerByWord
-    });
-    if (vocabularyEntries.length > 0) {
-      void queueVocabularyPersistence(vocabularyEntries);
-    }
-  }
+  finalizeTranslationBatch({
+    uniqueWords,
+    translations,
+    settings,
+    providerByWord
+  });
 
   return translations;
 }

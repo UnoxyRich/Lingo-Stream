@@ -31,6 +31,26 @@ Lingo Stream output (Spanish):
 - MyMemory
 - `auto` mode tries multiple providers and uses the first successful result
 
+## Supported Target Languages (Popup)
+
+- Spanish (`es`)
+- French (`fr`)
+- German (`de`)
+- Italian (`it`)
+- Portuguese (`pt`)
+- Japanese (`ja`)
+- Korean (`ko`)
+- Chinese (`zh`)
+- Russian (`ru`)
+- Arabic (`ar`)
+- Hindi (`hi`)
+- Turkish (`tr`)
+- Dutch (`nl`)
+- Swedish (`sv`)
+- Polish (`pl`)
+- Ukrainian (`uk`)
+- Vietnamese (`vi`)
+
 ## Install (Unpacked Extension)
 
 1. Install dependencies:

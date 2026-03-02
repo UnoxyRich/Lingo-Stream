@@ -333,4 +333,48 @@ describe('translation bridge layer', () => {
       })
     );
   });
+
+  it('persists cached vocabulary hits even when new misses fail in bridge', async () => {
+    globalThis.chrome = createChromeMock({
+      storageItems: {
+        saveVocabulary: true,
+        sourceLanguage: 'en',
+        targetLanguage: 'es'
+      },
+      response: {
+        ok: true,
+        translations: { hello: 'hola' },
+        meta: {
+          providerByWord: { hello: 'google' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
+
+    await window.translateWords(['hello']);
+    await flushStorageWrites();
+
+    globalThis.chrome.runtime.sendMessage.mockImplementation((_message, callback) => {
+      globalThis.chrome.runtime.lastError = { message: 'bridge unavailable' };
+      callback(undefined);
+      globalThis.chrome.runtime.lastError = null;
+    });
+
+    const translated = await window.translateWords(['hello', 'world']);
+    await flushStorageWrites();
+
+    expect(translated).toEqual({ hello: 'hola' });
+
+    const entries = globalThis.chrome._localStorageState.vocabularyEntries;
+    expect(Array.isArray(entries)).toBe(true);
+    expect(entries.length).toBe(1);
+    expect(entries[0]).toEqual(
+      expect.objectContaining({
+        translation: 'hola',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        count: 2
+      })
+    );
+  });
 });
