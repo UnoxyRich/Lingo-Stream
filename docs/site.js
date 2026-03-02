@@ -553,7 +553,9 @@ function attachTopbarContraction() {
   let ticking = false;
 
   const update = () => {
-    topbar.classList.toggle('compact', window.scrollY > 30);
+    const threshold = Math.max(44, window.innerHeight * 0.1);
+    const compact = window.scrollY > threshold;
+    topbar.classList.toggle('compact', compact);
     ticking = false;
   };
 
@@ -570,6 +572,84 @@ function attachTopbarContraction() {
   update();
 }
 
+function attachFloatingPlusField() {
+  const field = document.getElementById('floatingPlusField');
+  if (!field) {
+    return;
+  }
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const ornaments = [];
+
+  const buildOrnaments = () => {
+    field.replaceChildren();
+    ornaments.length = 0;
+    const desiredCount = clamp(Math.round(window.innerWidth / 58), 14, 36);
+
+    for (let index = 0; index < desiredCount; index += 1) {
+      const node = document.createElement('span');
+      node.className = 'floating-plus';
+      node.style.left = `${Math.random() * 100}%`;
+      node.style.top = `${Math.random() * 100}%`;
+      node.style.setProperty('--size', `${12 + Math.random() * 22}px`);
+      node.style.setProperty('--alpha', (0.06 + Math.random() * 0.16).toFixed(3));
+      node.style.setProperty('--spin-duration', `${12 + Math.random() * 30}s`);
+
+      const glyph = document.createElement('span');
+      glyph.className = 'floating-plus-glyph';
+      node.append(glyph);
+      field.append(node);
+
+      ornaments.push({
+        node,
+        driftX: (Math.random() * 90 - 45) * (Math.random() > 0.5 ? 1 : -1),
+        driftY: (Math.random() * 120 - 60) * (Math.random() > 0.5 ? 1 : -1),
+        depth: 0.25 + Math.random() * 1.05
+      });
+    }
+  };
+
+  const update = () => {
+    const y = window.scrollY || 0;
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const progress = clamp(y / maxScroll, 0, 1);
+    document.documentElement.style.setProperty('--scroll-progress', progress.toFixed(4));
+
+    for (const ornament of ornaments) {
+      const x = ornament.driftX * progress * ornament.depth;
+      const vertical = ornament.driftY * progress * ornament.depth;
+      const flow = y * (0.015 * ornament.depth);
+      ornament.node.style.transform = `translate3d(${x.toFixed(2)}px, ${(vertical + flow).toFixed(2)}px, 0)`;
+    }
+  };
+
+  let ticking = false;
+  const onScroll = () => {
+    if (ticking || reducedMotion.matches) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      update();
+      ticking = false;
+    });
+  };
+
+  const onResize = () => {
+    buildOrnaments();
+    update();
+  };
+
+  buildOrnaments();
+  update();
+
+  if (!reducedMotion.matches) {
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+  window.addEventListener('resize', onResize);
+}
+
 function attachBackgroundParallax() {
   const glowA = document.querySelector('.glow-a');
   const glowB = document.querySelector('.glow-b');
@@ -581,6 +661,8 @@ function attachBackgroundParallax() {
 
   const update = () => {
     const y = window.scrollY || 0;
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    document.documentElement.style.setProperty('--scroll-progress', String(clamp(y / maxScroll, 0, 1)));
     glowA.style.transform = `translate3d(${-y * 0.02}px, ${y * 0.04}px, 0)`;
     glowB.style.transform = `translate3d(${y * 0.018}px, ${-y * 0.03}px, 0)`;
     ticking = false;
@@ -596,6 +678,7 @@ function attachBackgroundParallax() {
   };
 
   window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
   update();
 }
 
@@ -603,17 +686,81 @@ function getSlideSections() {
   return Array.from(document.querySelectorAll('main .screen[id]'));
 }
 
+function attachSectionDepthEffect(sections) {
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return;
+  }
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (reducedMotion.matches) {
+    for (const section of sections) {
+      section.style.setProperty('--section-shift', '0');
+    }
+    return;
+  }
+
+  let ticking = false;
+
+  const update = () => {
+    const viewportCenter = window.innerHeight / 2;
+    const normalizer = Math.max(window.innerHeight * 0.7, 1);
+
+    for (const section of sections) {
+      const rect = section.getBoundingClientRect();
+      const sectionCenter = rect.top + rect.height / 2;
+      const shift = clamp((sectionCenter - viewportCenter) / normalizer, -1, 1);
+      section.style.setProperty('--section-shift', shift.toFixed(4));
+    }
+
+    ticking = false;
+  };
+
+  const onScroll = () => {
+    if (ticking) {
+      return;
+    }
+
+    ticking = true;
+    window.requestAnimationFrame(update);
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  update();
+}
+
+function getSectionCenterOffset(section) {
+  return section.offsetTop + section.offsetHeight / 2;
+}
+
+function getCenteredScrollTop(section) {
+  const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  const target = getSectionCenterOffset(section) - window.innerHeight / 2;
+  return clamp(target, 0, maxScroll);
+}
+
+function scrollSectionToCenter(section, behavior = 'smooth') {
+  if (!section) {
+    return;
+  }
+
+  window.scrollTo({
+    top: getCenteredScrollTop(section),
+    behavior
+  });
+}
+
 function findNearestSectionIndex(sections) {
   if (sections.length === 0) {
     return 0;
   }
 
-  const marker = window.scrollY + window.innerHeight * 0.42;
+  const marker = window.scrollY + window.innerHeight / 2;
   let nearestIndex = 0;
   let smallestDistance = Number.POSITIVE_INFINITY;
 
   for (let index = 0; index < sections.length; index += 1) {
-    const distance = Math.abs(sections[index].offsetTop - marker);
+    const distance = Math.abs(getSectionCenterOffset(sections[index]) - marker);
     if (distance >= smallestDistance) {
       continue;
     }
@@ -664,6 +811,7 @@ function hasScrollableAncestor(target, deltaY) {
 function attachSectionNavigation() {
   const sections = getSlideSections();
   const dotButtons = Array.from(document.querySelectorAll('.section-dot[data-target]'));
+  const anchorLinks = Array.from(document.querySelectorAll('a[href^="#"]'));
   const progressBar = document.getElementById('scrollProgressBar');
   if (sections.length === 0) {
     return {
@@ -680,6 +828,10 @@ function attachSectionNavigation() {
     activeIndex = clamp(index, 0, sections.length - 1);
     const activeSectionId = sections[activeIndex].id;
 
+    for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+      sections[sectionIndex].classList.toggle('is-current', sectionIndex === activeIndex);
+    }
+
     for (const button of dotButtons) {
       const isActive = button.dataset.target === activeSectionId;
       button.classList.toggle('is-active', isActive);
@@ -695,7 +847,7 @@ function attachSectionNavigation() {
   const scrollToIndex = (index, behavior = 'smooth') => {
     const targetIndex = clamp(index, 0, sections.length - 1);
     setActiveIndex(targetIndex);
-    sections[targetIndex].scrollIntoView({ behavior, block: 'start' });
+    scrollSectionToCenter(sections[targetIndex], behavior);
   };
 
   for (const button of dotButtons) {
@@ -705,6 +857,32 @@ function attachSectionNavigation() {
     }
 
     button.addEventListener('click', () => {
+      scrollToIndex(targetIndex, 'smooth');
+    });
+  }
+
+  for (const link of anchorLinks) {
+    const hash = (link.getAttribute('href') || '').trim();
+    const targetId = hash.startsWith('#') ? hash.slice(1) : '';
+    if (!targetId) {
+      continue;
+    }
+
+    if (targetId === 'top') {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        scrollToIndex(0, 'smooth');
+      });
+      continue;
+    }
+
+    const targetIndex = sectionIndexById.get(targetId);
+    if (typeof targetIndex !== 'number') {
+      continue;
+    }
+
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
       scrollToIndex(targetIndex, 'smooth');
     });
   }
@@ -776,11 +954,12 @@ function attachSegmentScroll(sectionController) {
     return;
   }
 
-  const deltaThreshold = 24;
-  const lockDurationMs = 680;
+  const deltaThreshold = 44;
+  const lockDurationMs = 760;
   let accumulatedDelta = 0;
   let locked = false;
   let lockTimer = 0;
+  let deltaResetTimer = 0;
 
   const scrollByDirection = (direction) => {
     const currentIndex = findNearestSectionIndex(sections);
@@ -816,6 +995,11 @@ function attachSegmentScroll(sectionController) {
     }
 
     accumulatedDelta += event.deltaY;
+    window.clearTimeout(deltaResetTimer);
+    deltaResetTimer = window.setTimeout(() => {
+      accumulatedDelta = 0;
+    }, 140);
+
     if (Math.abs(accumulatedDelta) < deltaThreshold) {
       return;
     }
@@ -856,6 +1040,7 @@ function attachSegmentScroll(sectionController) {
     accumulatedDelta = 0;
     locked = false;
     window.clearTimeout(lockTimer);
+    window.clearTimeout(deltaResetTimer);
   });
 }
 
@@ -1127,8 +1312,10 @@ function initializeSite() {
   attachRepositoryLinks(repositoryUrl);
   attachRevealAnimation();
   attachTopbarContraction();
+  attachFloatingPlusField();
   attachBackgroundParallax();
   const sectionController = attachSectionNavigation();
+  attachSectionDepthEffect(sectionController.sections);
   attachSegmentScroll(sectionController);
   attachInteractivePreview();
   updateCopyrightYear();

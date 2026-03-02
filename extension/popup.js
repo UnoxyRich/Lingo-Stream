@@ -2,11 +2,18 @@ const DEFAULT_SETTINGS = {
   translationProvider: 'auto',
   targetLanguage: 'es',
   replacementPercentage: 5,
-  enabled: true
+  enabled: true,
+  saveVocabulary: false
 };
 const DEBUG_STORAGE_KEYS = {
   enabled: 'debug',
   logs: 'debugLogs'
+};
+const LOCAL_STORAGE_KEYS = {
+  lastTranslationSuccessAt: 'lastTranslationSuccessAt',
+  lastTranslationSuccessProvider: 'lastTranslationSuccessProvider',
+  lastTranslationSuccessCount: 'lastTranslationSuccessCount',
+  vocabularyEntries: 'vocabularyEntries'
 };
 const LOG_POLL_INTERVAL_MS = 500;
 const SUPPORTED_PROVIDERS = new Set(['auto', 'google', 'libre', 'apertium', 'mymemory']);
@@ -20,10 +27,17 @@ const targetLanguageSelect = document.getElementById('targetLanguage');
 const replacementPercentageInput = document.getElementById('replacementPercentage');
 const replacementPercentageValue = document.getElementById('replacementPercentageValue');
 const enabledInput = document.getElementById('enabled');
+const saveVocabularyInput = document.getElementById('saveVocabulary');
 const saveButton = document.getElementById('saveButton');
 const saveStatus = document.getElementById('saveStatus');
 const runtimeStatus = document.getElementById('runtimeStatus');
 const attachButton = document.getElementById('attachButton');
+const contentHealthStatus = document.getElementById('contentHealthStatus');
+const translationHealthStatus = document.getElementById('translationHealthStatus');
+const recheckHealthButton = document.getElementById('recheckHealthButton');
+const vocabularyStatus = document.getElementById('vocabularyStatus');
+const exportVocabularyButton = document.getElementById('exportVocabularyButton');
+const clearVocabularyButton = document.getElementById('clearVocabularyButton');
 const debugEnabledInput = document.getElementById('debugEnabled');
 const clearLogsButton = document.getElementById('clearLogsButton');
 const logPanel = document.getElementById('logPanel');
@@ -32,6 +46,17 @@ let logPollTimer = null;
 
 function updateReplacementLabel(value) {
   replacementPercentageValue.textContent = `${value}%`;
+}
+
+function setStatusElement(element, message, tone = 'neutral') {
+  element.textContent = message;
+  element.classList.remove('ok', 'error');
+
+  if (tone === 'ok') {
+    element.classList.add('ok');
+  } else if (tone === 'error') {
+    element.classList.add('error');
+  }
 }
 
 function readFormSettings() {
@@ -45,7 +70,8 @@ function readFormSettings() {
     replacementPercentage: Number.isFinite(replacementPercentage)
       ? Math.max(0, Math.min(100, replacementPercentage))
       : DEFAULT_SETTINGS.replacementPercentage,
-    enabled: enabledInput.checked
+    enabled: enabledInput.checked,
+    saveVocabulary: saveVocabularyInput.checked
   };
 }
 
@@ -58,33 +84,16 @@ function applySettingsToForm(settings) {
   targetLanguageSelect.value = settings.targetLanguage;
   replacementPercentageInput.value = String(settings.replacementPercentage);
   enabledInput.checked = settings.enabled;
+  saveVocabularyInput.checked = settings.saveVocabulary === true;
   updateReplacementLabel(settings.replacementPercentage);
 }
 
 function showStatus(message, isError = false) {
-  saveStatus.textContent = message;
-  saveStatus.classList.remove('ok', 'error');
-  if (isError) {
-    saveStatus.classList.add('error');
-    return;
-  }
-
-  if (message) {
-    saveStatus.classList.add('ok');
-  }
+  setStatusElement(saveStatus, message, isError ? 'error' : (message ? 'ok' : 'neutral'));
 }
 
 function showRuntimeStatus(message, isError = false) {
-  runtimeStatus.textContent = message;
-  runtimeStatus.classList.remove('ok', 'error');
-  if (isError) {
-    runtimeStatus.classList.add('error');
-    return;
-  }
-
-  if (message) {
-    runtimeStatus.classList.add('ok');
-  }
+  setStatusElement(runtimeStatus, message, isError ? 'error' : (message ? 'ok' : 'neutral'));
 }
 
 function isYouTubeUrl(url) {
@@ -127,18 +136,207 @@ function sendTabMessage(tabId, message) {
   });
 }
 
+function getLocalStorage(keys) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(keys, (items) => {
+      if (chrome.runtime.lastError) {
+        resolve({});
+        return;
+      }
+
+      resolve(items ?? {});
+    });
+  });
+}
+
+function setLocalStorage(items) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(items, () => {
+      resolve(!chrome.runtime.lastError);
+    });
+  });
+}
+
+function showContentHealth(message, isError = false) {
+  setStatusElement(contentHealthStatus, message, isError ? 'error' : (message ? 'ok' : 'neutral'));
+}
+
+function formatHealthTimestamp(timestamp) {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return null;
+  }
+
+  const asDate = new Date(timestamp);
+  if (Number.isNaN(asDate.getTime())) {
+    return null;
+  }
+
+  return asDate.toLocaleString();
+}
+
+function renderTranslationHealth(items) {
+  const timestamp = Number(items?.[LOCAL_STORAGE_KEYS.lastTranslationSuccessAt]);
+  const provider = typeof items?.[LOCAL_STORAGE_KEYS.lastTranslationSuccessProvider] === 'string'
+    ? items[LOCAL_STORAGE_KEYS.lastTranslationSuccessProvider].trim()
+    : '';
+  const count = Number(items?.[LOCAL_STORAGE_KEYS.lastTranslationSuccessCount]);
+  const formattedTimestamp = formatHealthTimestamp(timestamp);
+
+  if (!formattedTimestamp) {
+    setStatusElement(translationHealthStatus, 'Last translation success: none yet.', 'neutral');
+    return;
+  }
+
+  const providerLabel = provider ? ` via ${provider}` : '';
+  const countLabel = Number.isFinite(count) && count > 0 ? ` (${count} words)` : '';
+  setStatusElement(
+    translationHealthStatus,
+    `Last translation success: ${formattedTimestamp}${providerLabel}${countLabel}.`,
+    'ok'
+  );
+}
+
+function normalizeVocabularyEntry(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  if (
+    typeof entry.source !== 'string' ||
+    typeof entry.translation !== 'string' ||
+    typeof entry.sourceLanguage !== 'string' ||
+    typeof entry.targetLanguage !== 'string'
+  ) {
+    return null;
+  }
+
+  const source = entry.source.trim();
+  const translation = entry.translation.trim();
+  const sourceLanguage = entry.sourceLanguage.trim();
+  const targetLanguage = entry.targetLanguage.trim();
+
+  if (!source || !translation || !sourceLanguage || !targetLanguage) {
+    return null;
+  }
+
+  return {
+    source,
+    translation,
+    sourceLanguage,
+    targetLanguage,
+    provider: typeof entry.provider === 'string' ? entry.provider.trim() : '',
+    count: Number.isFinite(entry.count) ? Math.max(1, Math.floor(entry.count)) : 1,
+    firstSeenAt: Number.isFinite(entry.firstSeenAt) ? entry.firstSeenAt : null,
+    lastSeenAt: Number.isFinite(entry.lastSeenAt) ? entry.lastSeenAt : null
+  };
+}
+
+function getVocabularyEntriesFromItems(items) {
+  const raw = items?.[LOCAL_STORAGE_KEYS.vocabularyEntries];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((entry) => normalizeVocabularyEntry(entry))
+    .filter((entry) => entry !== null);
+}
+
+function renderVocabularyStatus(entries) {
+  const count = Array.isArray(entries) ? entries.length : 0;
+  setStatusElement(vocabularyStatus, `Saved words: ${count}`, count > 0 ? 'ok' : 'neutral');
+  exportVocabularyButton.disabled = count === 0;
+  clearVocabularyButton.disabled = count === 0;
+}
+
+function csvEscapeCell(value) {
+  const normalized = String(value ?? '');
+  if (/["\n,]/.test(normalized)) {
+    return `"${normalized.replace(/"/g, '""')}"`;
+  }
+
+  return normalized;
+}
+
+function toIsoOrEmpty(timestamp) {
+  if (!Number.isFinite(timestamp)) {
+    return '';
+  }
+
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function buildVocabularyCsv(entries) {
+  const header = [
+    'source',
+    'translation',
+    'sourceLanguage',
+    'targetLanguage',
+    'provider',
+    'count',
+    'firstSeenAt',
+    'lastSeenAt'
+  ];
+  const rows = [header.join(',')];
+
+  for (const entry of entries) {
+    rows.push(
+      [
+        csvEscapeCell(entry.source),
+        csvEscapeCell(entry.translation),
+        csvEscapeCell(entry.sourceLanguage),
+        csvEscapeCell(entry.targetLanguage),
+        csvEscapeCell(entry.provider || ''),
+        csvEscapeCell(entry.count),
+        csvEscapeCell(toIsoOrEmpty(entry.firstSeenAt)),
+        csvEscapeCell(toIsoOrEmpty(entry.lastSeenAt))
+      ].join(',')
+    );
+  }
+
+  return rows.join('\n');
+}
+
+function downloadTextFile({ filename, content, mimeType }) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
+async function loadTranslationHealth() {
+  const items = await getLocalStorage([
+    LOCAL_STORAGE_KEYS.lastTranslationSuccessAt,
+    LOCAL_STORAGE_KEYS.lastTranslationSuccessProvider,
+    LOCAL_STORAGE_KEYS.lastTranslationSuccessCount
+  ]);
+  renderTranslationHealth(items);
+}
+
+async function loadVocabularyStatus() {
+  const items = await getLocalStorage([LOCAL_STORAGE_KEYS.vocabularyEntries]);
+  renderVocabularyStatus(getVocabularyEntriesFromItems(items));
+}
+
 async function checkContentConnection() {
   const activeTab = await getActiveTab();
   if (!activeTab?.id) {
     attachButton.disabled = true;
-    showRuntimeStatus('No active tab detected.', true);
+    showContentHealth('Content script: no active tab detected.', true);
     return;
   }
 
   const tabUrl = typeof activeTab.url === 'string' ? activeTab.url : '';
   if (tabUrl && !isYouTubeUrl(tabUrl)) {
     attachButton.disabled = true;
-    showRuntimeStatus('Open a YouTube video tab, then reopen this popup.');
+    showContentHealth('Content script: open a YouTube video tab first.', true);
     return;
   }
 
@@ -146,11 +344,19 @@ async function checkContentConnection() {
   const ping = await sendTabMessage(activeTab.id, { type: CONTENT_READY_MESSAGE });
 
   if (ping.ok && ping.response?.ok) {
-    showRuntimeStatus('Connected to this tab.');
+    showContentHealth('Content script: connected to active tab.');
     return;
   }
 
-  showRuntimeStatus('Not connected yet. Refresh the YouTube tab once, then click Recheck.', true);
+  showContentHealth('Content script: not connected. Refresh the YouTube tab and recheck.', true);
+}
+
+async function refreshHealthPanel() {
+  await Promise.all([
+    checkContentConnection(),
+    loadTranslationHealth(),
+    loadVocabularyStatus()
+  ]);
 }
 
 async function refreshActiveCaptions() {
@@ -173,6 +379,37 @@ async function refreshActiveCaptions() {
   }
 
   showRuntimeStatus('Refresh signal sent to content script.');
+}
+
+async function exportVocabulary() {
+  const items = await getLocalStorage([LOCAL_STORAGE_KEYS.vocabularyEntries]);
+  const entries = getVocabularyEntriesFromItems(items);
+
+  if (entries.length === 0) {
+    showRuntimeStatus('No saved vocabulary to export.', true);
+    return;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const csvContent = buildVocabularyCsv(entries);
+  downloadTextFile({
+    filename: `lingo-stream-vocabulary-${timestamp}.csv`,
+    content: csvContent,
+    mimeType: 'text/csv;charset=utf-8'
+  });
+
+  showRuntimeStatus(`Exported ${entries.length} vocabulary entries.`);
+}
+
+async function clearVocabulary() {
+  const success = await setLocalStorage({ [LOCAL_STORAGE_KEYS.vocabularyEntries]: [] });
+  if (!success) {
+    showRuntimeStatus('Unable to clear saved vocabulary.', true);
+    return;
+  }
+
+  renderVocabularyStatus([]);
+  showRuntimeStatus('Cleared saved vocabulary.');
 }
 
 function loadSettings() {
@@ -293,14 +530,49 @@ replacementPercentageInput.addEventListener('input', (event) => {
 
 saveButton.addEventListener('click', saveSettings);
 attachButton.addEventListener('click', refreshActiveCaptions);
+recheckHealthButton.addEventListener('click', () => {
+  showRuntimeStatus('Rechecking extension health...');
+  void refreshHealthPanel().then(() => {
+    if (runtimeStatus.textContent === 'Rechecking extension health...') {
+      showRuntimeStatus('');
+    }
+  });
+});
+exportVocabularyButton.addEventListener('click', () => {
+  void exportVocabulary();
+});
+clearVocabularyButton.addEventListener('click', () => {
+  void clearVocabulary();
+});
 debugEnabledInput.addEventListener('change', (event) => {
   setDebugMode(event.target.checked);
 });
 clearLogsButton.addEventListener('click', clearLogs);
 
+chrome.storage.onChanged?.addListener((changes, areaName) => {
+  if (areaName !== 'local') {
+    return;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(changes, LOCAL_STORAGE_KEYS.lastTranslationSuccessAt) ||
+    Object.prototype.hasOwnProperty.call(changes, LOCAL_STORAGE_KEYS.lastTranslationSuccessProvider) ||
+    Object.prototype.hasOwnProperty.call(changes, LOCAL_STORAGE_KEYS.lastTranslationSuccessCount)
+  ) {
+    void loadTranslationHealth();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, LOCAL_STORAGE_KEYS.vocabularyEntries)) {
+    const entries = getVocabularyEntriesFromItems({
+      [LOCAL_STORAGE_KEYS.vocabularyEntries]: changes[LOCAL_STORAGE_KEYS.vocabularyEntries]?.newValue
+    });
+    renderVocabularyStatus(entries);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   loadDebugSettings();
   startLogPolling();
-  void checkContentConnection();
+  void refreshHealthPanel();
 });

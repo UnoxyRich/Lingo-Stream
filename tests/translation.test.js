@@ -4,11 +4,38 @@ globalThis.window = globalThis;
 await import('../extension/translation.js');
 
 function createChromeMock({ storageItems = {}, response = null, runtimeErrorMessage = '' } = {}) {
+  const localStorageState = {};
+
   return {
     storage: {
       sync: {
         get: vi.fn((_keys, callback) => {
           callback(storageItems);
+        })
+      },
+      local: {
+        get: vi.fn((keys, callback) => {
+          if (Array.isArray(keys)) {
+            const picked = {};
+            for (const key of keys) {
+              picked[key] = localStorageState[key];
+            }
+            callback(picked);
+            return;
+          }
+
+          if (typeof keys === 'string') {
+            callback({ [keys]: localStorageState[keys] });
+            return;
+          }
+
+          callback({ ...localStorageState });
+        }),
+        set: vi.fn((items, callback) => {
+          Object.assign(localStorageState, items);
+          if (typeof callback === 'function') {
+            callback();
+          }
         })
       }
     },
@@ -24,13 +51,20 @@ function createChromeMock({ storageItems = {}, response = null, runtimeErrorMess
 
         callback(response);
       })
-    }
+    },
+    _localStorageState: localStorageState
   };
 }
 
 function resetTranslationCaches() {
   Object.keys(window.translationCache).forEach((key) => delete window.translationCache[key]);
   Object.keys(window.translationMissCache).forEach((key) => delete window.translationMissCache[key]);
+}
+
+async function flushStorageWrites() {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
 
 describe('translation bridge layer', () => {
@@ -241,5 +275,62 @@ describe('translation bridge layer', () => {
     expect(payload.targetLanguage).toBe('fr');
     expect(payload.translationEndpoint).toBe('https://apertium.org/apy/translate');
     expect(payload.translationTimeoutMs).toBe(1500);
+  });
+
+  it('stores last translation success health metadata in local storage', async () => {
+    globalThis.chrome = createChromeMock({
+      response: {
+        ok: true,
+        translations: { hello: 'hola' },
+        meta: {
+          providerByWord: { hello: 'google' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
+
+    await window.translateWords(['hello']);
+    await flushStorageWrites();
+
+    expect(globalThis.chrome._localStorageState.lastTranslationSuccessProvider).toBe('google');
+    expect(globalThis.chrome._localStorageState.lastTranslationSuccessCount).toBe(1);
+    expect(globalThis.chrome._localStorageState.lastTranslationSuccessAt).toBeTypeOf('number');
+  });
+
+  it('saves and merges vocabulary entries when saveVocabulary is enabled', async () => {
+    globalThis.chrome = createChromeMock({
+      storageItems: {
+        saveVocabulary: true,
+        sourceLanguage: 'en',
+        targetLanguage: 'es'
+      },
+      response: {
+        ok: true,
+        translations: { hello: 'hola' },
+        meta: {
+          providerByWord: { hello: 'mymemory' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
+
+    await window.translateWords(['hello']);
+    await flushStorageWrites();
+
+    await window.translateWords(['Hello']);
+    await flushStorageWrites();
+
+    const entries = globalThis.chrome._localStorageState.vocabularyEntries;
+    expect(Array.isArray(entries)).toBe(true);
+    expect(entries.length).toBe(1);
+    expect(entries[0]).toEqual(
+      expect.objectContaining({
+        source: expect.any(String),
+        translation: 'hola',
+        sourceLanguage: 'en',
+        targetLanguage: 'es',
+        count: 2
+      })
+    );
   });
 });

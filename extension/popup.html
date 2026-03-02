@@ -209,6 +209,15 @@
         margin-top: 3px;
       }
 
+      .section-title {
+        margin: 0 0 6px;
+        color: var(--accent-strong);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 800;
+      }
+
       button {
         border: 0;
         border-radius: 10px;
@@ -243,6 +252,29 @@
         color: var(--accent-strong);
         border: 1px solid rgba(15, 122, 125, 0.3);
         background: rgba(15, 122, 125, 0.08);
+      }
+
+      #recheckHealthButton,
+      #exportVocabularyButton,
+      #clearVocabularyButton {
+        flex: 1;
+        color: var(--accent-strong);
+        border: 1px solid rgba(15, 122, 125, 0.3);
+        background: rgba(15, 122, 125, 0.08);
+      }
+
+      .health-panel {
+        margin-top: 10px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        background: rgba(248, 251, 255, 0.84);
+      }
+
+      .health-line {
+        margin: 0 0 4px;
+        min-height: 14px;
+        font-size: 11px;
       }
 
       .status {
@@ -370,13 +402,41 @@
           <input id="enabled" name="enabled" type="checkbox" />
         </div>
 
+        <div class="field-inline switch-row">
+          <label for="saveVocabulary">Save translated vocabulary</label>
+          <input id="saveVocabulary" name="saveVocabulary" type="checkbox" />
+        </div>
+        <p class="hint">Optional: store translated words locally so you can export them later.</p>
+
         <div class="button-row">
           <button id="saveButton" type="button">Save Settings</button>
           <button id="attachButton" type="button">Refresh Captions</button>
         </div>
 
         <p id="saveStatus" class="status" role="status" aria-live="polite"></p>
-        <p id="runtimeStatus" class="status" role="status" aria-live="polite">Checking active tab connection...</p>
+        <p id="runtimeStatus" class="status" role="status" aria-live="polite"></p>
+
+        <div class="health-panel">
+          <p class="section-title">Health Check</p>
+          <p id="contentHealthStatus" class="status health-line" role="status" aria-live="polite">
+            Content script: checking active tab...
+          </p>
+          <p id="translationHealthStatus" class="status health-line" role="status" aria-live="polite">
+            Last translation success: none yet.
+          </p>
+          <div class="button-row">
+            <button id="recheckHealthButton" type="button">Recheck Health</button>
+          </div>
+        </div>
+
+        <div class="health-panel">
+          <p class="section-title">Vocabulary</p>
+          <p id="vocabularyStatus" class="status health-line" role="status" aria-live="polite">Saved words: 0</p>
+          <div class="button-row">
+            <button id="exportVocabularyButton" type="button">Export Vocabulary</button>
+            <button id="clearVocabularyButton" type="button">Clear Saved</button>
+          </div>
+        </div>
 
         <details>
           <summary>Debug Tools</summary>

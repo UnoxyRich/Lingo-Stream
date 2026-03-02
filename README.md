@@ -1,88 +1,114 @@
-# 🎧 Lingo Stream
+# Lingo Stream
 
-A Chrome extension that helps users learn a foreign language by replacing a small percentage of YouTube subtitles with translated words.
+Lingo Stream is a Chrome Extension (Manifest V3) that helps with language immersion on YouTube by replacing a small percentage of caption words with inline translations.
 
 Example:
 
 Original:
-"I really enjoy learning new skills every day."
+`I really enjoy learning new skills every day.`
 
-Lingo Stream Output (Spanish 5%):
-"I really enjoy learning new skills (habilidades) every day."
+Lingo Stream output (Spanish):
+`I really enjoy (gusto) learning new skills every day.`
 
----
+## What It Does
 
-## 🚀 Features (MVP)
+- Observes YouTube caption updates in real time
+- Filters low-value tokens (stop words, short words, numbers)
+- Replaces a configurable percentage of meaningful words
+- Uses free translation providers with fallback support
+- Caches translation hits and misses to reduce repeated requests
+- Includes popup health checks:
+  - content script connection status
+  - last translation success timestamp/provider/count
+- Supports optional vocabulary saving and CSV export
+- Includes debug logs in popup for troubleshooting
 
-- Detects YouTube auto-generated subtitles
-- Replaces ~5% of meaningful words
-- Filters out stop words (is, are, a, the, etc.)
-- Uses free public translation endpoints (no API key required)
-- User selects target language
-- Adjustable replacement percentage
-- Real-time subtitle modification using MutationObserver
+## Supported Translation Providers
 
----
+- Google endpoint (`translate.googleapis.com`)
+- LibreTranslate public mirrors
+- Apertium APY
+- MyMemory
+- `auto` mode tries multiple providers and uses the first successful result
 
-## 🏗 Architecture
+## Install (Unpacked Extension)
 
-Chrome Extension (Manifest V3)
+1. Install dependencies:
+   `npm install`
+2. Run checks:
+   `npm run build`
+3. Open Chrome and go to `chrome://extensions`
+4. Enable **Developer mode**
+5. Click **Load unpacked**
+6. Select the `extension/` folder
 
-Files:
+## Usage
 
-/extension
-- manifest.json
-- content.js
-- popup.html
-- popup.js
-- stopwords.js
+1. Open a YouTube video with captions enabled.
+2. Open the extension popup.
+3. Configure:
+   - translation provider
+   - target language
+   - replacement percentage
+   - enable/disable extension
+   - optional vocabulary saving
+4. Click **Save Settings**.
+5. If needed, click **Refresh Captions**.
+6. Use **Recheck Health** in the popup to verify runtime status.
+7. Use **Export Vocabulary** to download saved entries as CSV.
 
----
+## Development
 
-## 🧠 How It Works
+### Scripts
 
-1. The extension observes YouTube's subtitle DOM elements:
-   `.ytp-caption-segment`
+- `npm run lint` - run ESLint
+- `npm test` - run Vitest suite
+- `npm run test:coverage` - run tests with coverage
+- `npm run validate:manifest` - validate manifest structure
+- `npm run build` - sync assets + build checks
+- `npm run ci` - lint + manifest validation + coverage + build
 
-2. When new subtitles appear:
-   - Text is split into words
-   - Stop words are filtered out
-   - A percentage of remaining words are selected
-   - Words are translated via API
-   - Modified text is re-rendered
+### Project Structure
 
----
+- `extension/` - Chrome extension runtime files
+  - `content.js` - content entrypoint and observer wiring
+  - `captionObserver.js` - mutation processing pipeline
+  - `processor.js` - token selection and inline rendering
+  - `translation.js` - bridge client, cache, vocabulary persistence
+  - `background.js` - provider bridge and sender validation
+  - `popup.html` / `popup.js` - settings, health, export UI
+- `tests/` - unit and integration tests
+- `scripts/` - validation/build helper scripts
+- `docs/` - project website/docs assets
 
-## 🔑 API
+## Testing
 
-This extension uses free public translation providers and does not require API keys, billing, or self-hosting.
+The suite includes:
 
-- LibreTranslate public mirror: `https://translate.cutie.dating/translate`
-- Lingva Translate proxy: `https://lingva.ml/api/v1/{source}/{target}/{text}`
+- Unit tests for processor, stopwords, translation bridge, and background logic
+- Content bundle load test to ensure script compatibility in manifest order
+- End-to-end integration test that simulates caption DOM mutation updates
 
-Users can choose their provider in the popup and the extension falls back to the other provider if the selected one is unavailable.
+Run all tests:
 
----
+`npm test`
 
-## ⚠️ Known Limitations
+## Data and Privacy
 
-- API calls are not yet cached
-- May translate the same word multiple times
-- No grammar awareness
-- No vocabulary tracking
-- No batching of translation requests
-- No rate limiting handling
+- Settings are stored in `chrome.storage.sync`
+- Debug logs, health metadata, and optional vocabulary entries are stored in `chrome.storage.local`
+- No API keys are required for default providers
 
----
+## Current Limitations
 
-## 🛠 Future Improvements
+- Public translation endpoints may rate-limit or throttle
+- Quality and availability depend on third-party services
+- Inline translation format is optimized for speed, not grammar correctness
 
-- Add translation caching
-- Add hover tooltip instead of inline replacement
-- Batch API requests
-- Word frequency tracking
-- Difficulty levels (A1–C2)
-- Vocabulary saving
-- Dashboard page
-- Performance optimization
-- Dark mode UI
+## Roadmap
+
+- Vocabulary import workflow (CSV/JSON)
+- Vocabulary filtering/search in popup
+- Better provider throttling/backoff handling
+- Richer health diagnostics for translation failures
+- CI smoke checks for YouTube caption fixtures

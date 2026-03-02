@@ -18,12 +18,23 @@
 - [x] Added `https://translate.googleapis.com/*` permission
 - [x] Broadened YouTube URL matching to `https://*.youtube.com/*`
 - [x] Added tests for internal sender fallback and Google provider parsing
+- [x] Added integration/e2e test that simulates caption DOM updates end-to-end
+- [x] Added explicit popup health checks for content-script connection and last translation success
+- [x] Added optional vocabulary save/export workflow (toggle + CSV export + clear)
+- [x] Added translation health + vocabulary persistence tests
 
 ## Remaining TODO
-- [ ] Add integration/e2e test that simulates caption DOM updates end-to-end
-- [ ] Add explicit in-popup health check (content script attached + last translation success)
+- [x] Add integration/e2e test that simulates caption DOM updates end-to-end
+- [x] Add explicit in-popup health check in ui panel (content script attached + last translation success)
+- [x] Add optional vocabulary save/export workflow
+
+## Future TODO (Planned)
+- [ ] Add vocabulary import workflow (CSV/JSON) so users can restore or migrate saved words
+- [ ] Add vocabulary filters/search in popup (language/provider/date)
 - [ ] Add backoff/rate-limit handling for provider throttling
-- [ ] Add optional vocabulary save/export workflow
+- [ ] Add last-translation failure diagnostics in popup health panel (error + provider fallback trace)
+- [ ] Add nightly CI job with extension E2E smoke test against a stable YouTube caption fixture
+- [ ] Add UX polish for saved vocabulary count badges and export confirmation states
 
 ## Definition of Done (MVP)
 - [x] Extension installs successfully
