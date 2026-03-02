@@ -352,6 +352,13 @@ h3 {
   gap: 24px;
 }
 
+.feature-screen .screen-inner {
+  min-height: calc(100svh - 154px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .feature-item {
   position: relative;
   padding: 16px 16px 16px 22px;
@@ -410,7 +417,9 @@ h3 {
   display: grid;
   grid-template-columns: 1.02fr 0.98fr;
   gap: 30px;
-  align-items: start;
+  align-items: center;
+  align-content: center;
+  min-height: calc(100svh - 154px);
 }
 
 .preview-controls {
@@ -646,6 +655,8 @@ h3 {
   grid-template-columns: 1fr 1fr;
   gap: 26px;
   align-items: center;
+  align-content: center;
+  min-height: calc(100svh - 154px);
 }
 
 .install-copy ol {
@@ -820,6 +831,7 @@ code {
   .preview-layout,
   .install-layout {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 
   .feature-row {
@@ -830,6 +842,10 @@ code {
   .feature-strip,
   .hero-badges {
     grid-template-columns: 1fr;
+  }
+
+  .feature-screen .screen-inner {
+    min-height: auto;
   }
 }
 

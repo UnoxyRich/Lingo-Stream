@@ -34,162 +34,56 @@ const WORD_PRIORITY = [
   'night',
   'quickly'
 ];
-const TRANSLATIONS_BY_LANGUAGE = {
-  es: {
-    enjoy: 'disfrutar',
-    learning: 'aprender',
-    skills: 'habilidades',
-    every: 'cada',
-    day: 'dia',
-    watching: 'mirando',
-    videos: 'videos',
-    helps: 'ayuda',
-    build: 'construir',
-    language: 'idioma',
-    confidence: 'confianza',
-    quickly: 'rapido',
-    practice: 'practicar',
-    speaking: 'hablar',
-    friends: 'amigos',
-    review: 'repasar',
-    new: 'nuevo',
-    vocabulary: 'vocabulario',
-    night: 'noche',
-    daily: 'diario'
-  },
-  fr: {
-    enjoy: 'aimer',
-    learning: 'apprendre',
-    skills: 'competences',
-    every: 'chaque',
-    day: 'jour',
-    watching: 'regarder',
-    videos: 'videos',
-    helps: 'aide',
-    build: 'construire',
-    language: 'langue',
-    confidence: 'confiance',
-    quickly: 'vite',
-    practice: 'pratiquer',
-    speaking: 'parler',
-    friends: 'amis',
-    review: 'reviser',
-    new: 'nouveau',
-    vocabulary: 'vocabulaire',
-    night: 'nuit',
-    daily: 'quotidien'
-  },
-  de: {
-    enjoy: 'geniessen',
-    learning: 'lernen',
-    skills: 'fertigkeiten',
-    every: 'jeden',
-    day: 'tag',
-    watching: 'ansehen',
-    videos: 'videos',
-    helps: 'hilft',
-    build: 'aufbauen',
-    language: 'sprache',
-    confidence: 'vertrauen',
-    quickly: 'schnell',
-    practice: 'uben',
-    speaking: 'sprechen',
-    friends: 'freunde',
-    review: 'wiederholen',
-    new: 'neu',
-    vocabulary: 'wortschatz',
-    night: 'nacht',
-    daily: 'taglich'
-  },
-  it: {
-    enjoy: 'godere',
-    learning: 'imparare',
-    skills: 'abilita',
-    every: 'ogni',
-    day: 'giorno',
-    watching: 'guardare',
-    videos: 'video',
-    helps: 'aiuta',
-    build: 'costruire',
-    language: 'lingua',
-    confidence: 'fiducia',
-    quickly: 'veloce',
-    practice: 'praticare',
-    speaking: 'parlare',
-    friends: 'amici',
-    review: 'ripassare',
-    new: 'nuovo',
-    vocabulary: 'vocabolario',
-    night: 'notte',
-    daily: 'quotidiano'
-  },
-  pt: {
-    enjoy: 'curtir',
-    learning: 'aprender',
-    skills: 'habilidades',
-    every: 'cada',
-    day: 'dia',
-    watching: 'assistindo',
-    videos: 'videos',
-    helps: 'ajuda',
-    build: 'construir',
-    language: 'idioma',
-    confidence: 'confianca',
-    quickly: 'rapido',
-    practice: 'praticar',
-    speaking: 'falar',
-    friends: 'amigos',
-    review: 'revisar',
-    new: 'novo',
-    vocabulary: 'vocabulario',
-    night: 'noite',
-    daily: 'diario'
-  },
-  ja: {
-    enjoy: 'tanoshimu',
-    learning: 'manabu',
-    skills: 'sukiru',
-    every: 'mai',
-    day: 'hi',
-    watching: 'miru',
-    videos: 'bideo',
-    helps: 'tasukeru',
-    build: 'kizuku',
-    language: 'gengo',
-    confidence: 'jishin',
-    quickly: 'hayaku',
-    practice: 'renshuu',
-    speaking: 'hanasu',
-    friends: 'tomodachi',
-    review: 'fukushu',
-    new: 'atarashii',
-    vocabulary: 'goi',
-    night: 'yoru',
-    daily: 'mainichi'
-  },
-  ko: {
-    enjoy: 'jeulgida',
-    learning: 'baeuda',
-    skills: 'gisul',
-    every: 'maeil',
-    day: 'nal',
-    watching: 'boda',
-    videos: 'bidio',
-    helps: 'doum',
-    build: 'mandeulda',
-    language: 'eoneo',
-    confidence: 'jasin',
-    quickly: 'ppareuge',
-    practice: 'yeonseub',
-    speaking: 'malhada',
-    friends: 'chingu',
-    review: 'bogi',
-    new: 'sae',
-    vocabulary: 'eohwi',
-    night: 'bam',
-    daily: 'maeil'
-  }
-};
+const STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'been',
+  'but',
+  'by',
+  'for',
+  'from',
+  'has',
+  'have',
+  'he',
+  'her',
+  'his',
+  'i',
+  'in',
+  'is',
+  'it',
+  'its',
+  'me',
+  'my',
+  'of',
+  'on',
+  'or',
+  'our',
+  'she',
+  'that',
+  'the',
+  'their',
+  'them',
+  'they',
+  'this',
+  'to',
+  'us',
+  'we',
+  'with',
+  'you',
+  'your'
+]);
+const TRANSLATION_TIMEOUT_MS = 2400;
+const TRANSLATION_MISS_TTL_MS = 30 * 1000;
+const SOURCE_LANGUAGE = 'en';
+const AUTO_PROVIDER_ORDER = ['google', 'libre', 'apertium', 'mymemory'];
+const LIBRE_ENDPOINTS = ['https://translate.argosopentech.com/translate', 'https://libretranslate.com/translate'];
+const translationCache = new Map();
+const translationMissCache = new Map();
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -204,6 +98,12 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function decodeHtmlEntities(value) {
+  const decoderNode = document.createElement('textarea');
+  decoderNode.innerHTML = String(value ?? '');
+  return decoderNode.value;
+}
+
 function sanitizeSentence(inputValue) {
   const normalized = String(inputValue || '')
     .replace(/\s+/g, ' ')
@@ -216,6 +116,169 @@ function normalizeWord(value) {
     .toLowerCase()
     .replace(/[^a-z']/g, '');
 }
+
+function getTranslationCacheKey(provider, sourceLanguage, targetLanguage, normalizedWord) {
+  return `${provider}|${sourceLanguage}|${targetLanguage}|${normalizedWord}`;
+}
+
+function isMissCached(cacheKey, now = Date.now()) {
+  const expiry = translationMissCache.get(cacheKey);
+  if (!expiry) {
+    return false;
+  }
+
+  if (expiry > now) {
+    return true;
+  }
+
+  translationMissCache.delete(cacheKey);
+  return false;
+}
+
+function markMissCached(cacheKey, now = Date.now()) {
+  translationMissCache.set(cacheKey, now + TRANSLATION_MISS_TTL_MS);
+}
+
+function extractTranslatedText(payload) {
+  if (typeof payload === 'string') {
+    return payload;
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+
+  if (typeof payload.translatedText === 'string') {
+    return payload.translatedText;
+  }
+
+  if (typeof payload.translation === 'string') {
+    return payload.translation;
+  }
+
+  if (payload.responseData && typeof payload.responseData.translatedText === 'string') {
+    return payload.responseData.translatedText;
+  }
+
+  if (Array.isArray(payload.matches)) {
+    for (const match of payload.matches) {
+      if (typeof match?.translation === 'string' && match.translation.trim()) {
+        return match.translation;
+      }
+    }
+  }
+
+  return '';
+}
+
+async function fetchJsonWithTimeout(url, init = {}, timeoutMs = TRANSLATION_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function cleanTranslatedResult(originalWord, value) {
+  const decoded = decodeHtmlEntities(value);
+  const cleaned = decoded
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) {
+    return '';
+  }
+
+  if (normalizeWord(cleaned) === normalizeWord(originalWord)) {
+    return '';
+  }
+
+  return cleaned;
+}
+
+async function requestGoogleTranslation(word, targetLanguage, sourceLanguage) {
+  const url = new URL('https://translate.googleapis.com/translate_a/single');
+  url.searchParams.set('client', 'gtx');
+  url.searchParams.set('sl', sourceLanguage);
+  url.searchParams.set('tl', targetLanguage);
+  url.searchParams.set('dt', 't');
+  url.searchParams.set('q', word);
+
+  const payload = await fetchJsonWithTimeout(url.toString());
+  if (!Array.isArray(payload) || !Array.isArray(payload[0])) {
+    return '';
+  }
+
+  const fragments = payload[0]
+    .map((part) => (Array.isArray(part) && typeof part[0] === 'string' ? part[0] : ''))
+    .filter(Boolean);
+  return fragments.join('').trim();
+}
+
+async function requestLibreTranslation(word, targetLanguage, sourceLanguage) {
+  const body = JSON.stringify({
+    q: word,
+    source: sourceLanguage,
+    target: targetLanguage,
+    format: 'text'
+  });
+
+  for (const endpoint of LIBRE_ENDPOINTS) {
+    try {
+      const payload = await fetchJsonWithTimeout(endpoint, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body
+      });
+
+      const translated = extractTranslatedText(payload);
+      if (translated) {
+        return translated;
+      }
+    } catch (_error) {
+      // Try next mirror when available.
+    }
+  }
+
+  return '';
+}
+
+async function requestApertiumTranslation(word, targetLanguage, sourceLanguage) {
+  const url = new URL('https://beta.apertium.org/apy/translate');
+  url.searchParams.set('q', word);
+  url.searchParams.set('langpair', `${sourceLanguage}|${targetLanguage}`);
+
+  const payload = await fetchJsonWithTimeout(url.toString());
+  return extractTranslatedText(payload);
+}
+
+async function requestMyMemoryTranslation(word, targetLanguage, sourceLanguage) {
+  const url = new URL('https://api.mymemory.translated.net/get');
+  url.searchParams.set('q', word);
+  url.searchParams.set('langpair', `${sourceLanguage}|${targetLanguage}`);
+
+  const payload = await fetchJsonWithTimeout(url.toString());
+  return extractTranslatedText(payload);
+}
+
+const providerHandlers = {
+  google: requestGoogleTranslation,
+  libre: requestLibreTranslation,
+  apertium: requestApertiumTranslation,
+  mymemory: requestMyMemoryTranslation
+};
 
 function extractWordParts(token) {
   const match = String(token).match(/^([^A-Za-z']*)([A-Za-z']+)([^A-Za-z']*)$/);
@@ -265,8 +328,108 @@ function pickReplacementIndices(candidates, replacementCount) {
   return new Set(sortedCandidates.slice(0, replacementCount).map((entry) => entry.index));
 }
 
-function buildTranslatedLine(sentence, language, replacementPercentage, enabled) {
-  const translations = TRANSLATIONS_BY_LANGUAGE[language] ?? TRANSLATIONS_BY_LANGUAGE.es;
+async function translateWordByProvider(word, provider, sourceLanguage, targetLanguage) {
+  const normalizedWord = normalizeWord(word);
+  if (!normalizedWord) {
+    return { translated: '', providerUsed: '', failedProviders: [] };
+  }
+
+  const now = Date.now();
+  const providers =
+    provider === 'auto'
+      ? AUTO_PROVIDER_ORDER
+      : AUTO_PROVIDER_ORDER.includes(provider)
+      ? [provider]
+      : AUTO_PROVIDER_ORDER;
+  const failedProviders = [];
+
+  for (const providerName of providers) {
+    const cacheKey = getTranslationCacheKey(providerName, sourceLanguage, targetLanguage, normalizedWord);
+    if (translationCache.has(cacheKey)) {
+      return {
+        translated: translationCache.get(cacheKey) ?? '',
+        providerUsed: providerName,
+        failedProviders
+      };
+    }
+
+    if (isMissCached(cacheKey, now)) {
+      failedProviders.push(providerName);
+      continue;
+    }
+
+    const handler = providerHandlers[providerName];
+    if (typeof handler !== 'function') {
+      failedProviders.push(providerName);
+      continue;
+    }
+
+    try {
+      const rawTranslated = await handler(word, targetLanguage, sourceLanguage);
+      const cleaned = cleanTranslatedResult(word, rawTranslated);
+      if (cleaned) {
+        translationCache.set(cacheKey, cleaned);
+        if (provider === 'auto') {
+          const autoCacheKey = getTranslationCacheKey('auto', sourceLanguage, targetLanguage, normalizedWord);
+          translationCache.set(autoCacheKey, cleaned);
+        }
+
+        return { translated: cleaned, providerUsed: providerName, failedProviders };
+      }
+    } catch (_error) {
+      // Try fallback providers.
+    }
+
+    markMissCached(cacheKey, now);
+    failedProviders.push(providerName);
+  }
+
+  return { translated: '', providerUsed: '', failedProviders };
+}
+
+async function translateWordsViaApi(words, provider, sourceLanguage, targetLanguage) {
+  const uniqueWords = [];
+  const seen = new Set();
+
+  for (const word of words) {
+    const normalizedWord = normalizeWord(word);
+    if (!normalizedWord || seen.has(normalizedWord)) {
+      continue;
+    }
+
+    seen.add(normalizedWord);
+    uniqueWords.push(normalizedWord);
+  }
+
+  const translations = {};
+  const providerByWord = {};
+  const failedProvidersByWord = {};
+
+  const translationTasks = uniqueWords.map(async (normalizedWord) => {
+    const result = await translateWordByProvider(normalizedWord, provider, sourceLanguage, targetLanguage);
+    if (result.translated) {
+      translations[normalizedWord] = result.translated;
+    }
+
+    if (result.providerUsed) {
+      providerByWord[normalizedWord] = result.providerUsed;
+    }
+
+    if (result.failedProviders.length > 0) {
+      failedProvidersByWord[normalizedWord] = result.failedProviders;
+    }
+  });
+
+  await Promise.all(translationTasks);
+
+  return {
+    translations,
+    providerByWord,
+    failedProvidersByWord
+  };
+}
+
+async function buildTranslatedLine(sentence, language, replacementPercentage, enabled, provider) {
   const normalizedSentence = sanitizeSentence(sentence);
   const tokens = normalizedSentence.split(' ');
   const candidates = [];
@@ -280,13 +443,27 @@ function buildTranslatedLine(sentence, language, replacementPercentage, enabled)
 
     totalWords += 1;
     const key = normalizeWord(parts.word);
-    if (key && Object.prototype.hasOwnProperty.call(translations, key)) {
+    if (key.length >= 2 && !STOPWORDS.has(key)) {
       candidates.push({ index, key, word: parts.word });
     }
   }
 
   const replacementCount = calculateReplacementCount(replacementPercentage, enabled, candidates.length);
   const selectedIndices = enabled ? pickReplacementIndices(candidates, replacementCount) : new Set();
+  const wordsToTranslate = [];
+  for (const candidate of candidates) {
+    if (selectedIndices.has(candidate.index)) {
+      wordsToTranslate.push(candidate.key);
+    }
+  }
+
+  const translationResponse =
+    enabled && wordsToTranslate.length > 0
+      ? await translateWordsViaApi(wordsToTranslate, provider, SOURCE_LANGUAGE, language)
+      : { translations: {}, providerByWord: {}, failedProvidersByWord: {} };
+  const translations = translationResponse.translations;
+  let replacedCount = 0;
+
   const fragments = tokens.map((token, index) => {
     const parts = extractWordParts(token);
     if (!parts) {
@@ -307,15 +484,18 @@ function buildTranslatedLine(sentence, language, replacementPercentage, enabled)
     const safeWord = escapeHtml(parts.word);
     const safeSuffix = escapeHtml(parts.suffix);
     const safeTranslated = escapeHtml(translated);
+    replacedCount += 1;
     return `${safePrefix}<span class="word-pair">${safeWord} <span class="translation">(${safeTranslated})</span></span>${safeSuffix}`;
   });
 
   return {
     sentence: normalizedSentence,
     html: fragments.join(' '),
-    replacedCount: enabled ? selectedIndices.size : 0,
+    replacedCount,
     candidateCount: candidates.length,
-    totalWords
+    totalWords,
+    providerByWord: translationResponse.providerByWord,
+    failedProvidersByWord: translationResponse.failedProvidersByWord
   };
 }
 
@@ -773,26 +953,85 @@ function attachInteractivePreview() {
     }
   };
 
-  const updatePreview = () => {
+  let previewRequestId = 0;
+  let updateTimerId = 0;
+
+  const summarizeUsedProviders = (providerByWord) => {
+    const used = new Set(Object.values(providerByWord));
+    if (used.size === 0) {
+      return '';
+    }
+
+    return Array.from(used)
+      .sort()
+      .join(', ');
+  };
+
+  const runPreviewUpdate = async () => {
     const percentage = clamp(Number.parseInt(replacementInput.value, 10) || 1, 1, 100);
     replacementInput.value = String(percentage);
     replacementValue.textContent = `${percentage}%`;
 
     const enabled = enabledInput.checked;
+    const providerValue = providerInput.value;
     const providerLabel = providerInput.options[providerInput.selectedIndex]?.textContent || 'Auto fallback';
     const languageLabel = languageInput.options[languageInput.selectedIndex]?.textContent || 'Spanish';
     const sentence = sanitizeSentence(customSentenceInput ? customSentenceInput.value : DEFAULT_SENTENCE);
-    const translated = buildTranslatedLine(sentence, languageInput.value, percentage, enabled);
+
+    if (!enabled) {
+      originalLineNode.textContent = sentence;
+      const originalLineHtml = escapeHtml(sentence);
+      animateLine(translatedLineNode, originalLineHtml);
+      if (heroSubtitleLineNode) {
+        animateLine(heroSubtitleLineNode, originalLineHtml);
+      }
+
+      if (previewDensityNode) {
+        previewDensityNode.textContent = '0%';
+      }
+
+      if (previewWordCountNode) {
+        previewWordCountNode.textContent = String(sentence.split(/\s+/).filter(Boolean).length);
+      }
+
+      if (previewStatusNode) {
+        previewStatusNode.textContent = 'Paused';
+      }
+
+      previewMeta.textContent = 'Lingo Stream disabled - captions stay original.';
+      setActivePhrase(sentence);
+      return;
+    }
+
+    const requestId = ++previewRequestId;
+    if (previewStatusNode) {
+      previewStatusNode.textContent = 'Translating...';
+    }
+    previewMeta.textContent = `Provider: ${providerLabel} - Target: ${languageLabel} - Translating...`;
+
+    const translated = await buildTranslatedLine(
+      sentence,
+      languageInput.value,
+      percentage,
+      enabled,
+      providerValue
+    );
+
+    if (requestId !== previewRequestId) {
+      return;
+    }
 
     originalLineNode.textContent = translated.sentence;
-    const renderedLine = enabled ? translated.html : escapeHtml(translated.sentence);
-    animateLine(translatedLineNode, renderedLine);
+    animateLine(translatedLineNode, translated.html);
     if (heroSubtitleLineNode) {
-      animateLine(heroSubtitleLineNode, renderedLine);
+      animateLine(heroSubtitleLineNode, translated.html);
     }
 
     if (previewDensityNode) {
-      const density = translated.candidateCount > 0 ? Math.round((translated.replacedCount / translated.candidateCount) * 100) : 0;
+      const density =
+        translated.candidateCount > 0
+          ? Math.round((translated.replacedCount / translated.candidateCount) * 100)
+          : 0;
       previewDensityNode.textContent = `${density}%`;
     }
 
@@ -800,18 +1039,29 @@ function attachInteractivePreview() {
       previewWordCountNode.textContent = String(translated.totalWords);
     }
 
+    const usedProviders = summarizeUsedProviders(translated.providerByWord);
+    const failedWords = Object.keys(translated.failedProvidersByWord).length;
     if (previewStatusNode) {
-      previewStatusNode.textContent = enabled ? 'Active' : 'Paused';
+      if (translated.replacedCount > 0 && failedWords === 0) {
+        previewStatusNode.textContent = 'Active';
+      } else if (translated.replacedCount > 0) {
+        previewStatusNode.textContent = 'Partial';
+      } else {
+        previewStatusNode.textContent = 'No matches';
+      }
     }
 
-    if (!enabled) {
-      previewMeta.textContent = 'Lingo Stream disabled - captions stay original.';
-      setActivePhrase(sentence);
-      return;
-    }
-
-    previewMeta.textContent = `Provider: ${providerLabel} - Target: ${languageLabel} - Replaced words: ${translated.replacedCount}`;
+    const autoProviderInfo = providerValue === 'auto' && usedProviders ? ` (${usedProviders})` : '';
+    const missInfo = failedWords > 0 ? ` - API misses: ${failedWords}` : '';
+    previewMeta.textContent = `Provider: ${providerLabel}${autoProviderInfo} - Target: ${languageLabel} - Replaced words: ${translated.replacedCount}${missInfo}`;
     setActivePhrase(sentence);
+  };
+
+  const schedulePreviewUpdate = (delayMs = 0) => {
+    window.clearTimeout(updateTimerId);
+    updateTimerId = window.setTimeout(() => {
+      void runPreviewUpdate();
+    }, delayMs);
   };
 
   for (const button of phraseButtons) {
@@ -821,16 +1071,26 @@ function attachInteractivePreview() {
       }
 
       customSentenceInput.value = sanitizeSentence(button.dataset.phrase || DEFAULT_SENTENCE);
-      updatePreview();
+      schedulePreviewUpdate();
     });
   }
 
-  providerInput.addEventListener('change', updatePreview);
-  languageInput.addEventListener('change', updatePreview);
-  replacementInput.addEventListener('input', updatePreview);
-  enabledInput.addEventListener('change', updatePreview);
+  providerInput.addEventListener('change', () => {
+    schedulePreviewUpdate();
+  });
+  languageInput.addEventListener('change', () => {
+    schedulePreviewUpdate();
+  });
+  replacementInput.addEventListener('input', () => {
+    schedulePreviewUpdate(120);
+  });
+  enabledInput.addEventListener('change', () => {
+    schedulePreviewUpdate();
+  });
   if (customSentenceInput) {
-    customSentenceInput.addEventListener('input', updatePreview);
+    customSentenceInput.addEventListener('input', () => {
+      schedulePreviewUpdate(260);
+    });
   }
 
   if (saveButton) {
@@ -843,14 +1103,16 @@ function attachInteractivePreview() {
   }
 
   if (refreshButton) {
-    refreshButton.addEventListener('click', updatePreview);
+    refreshButton.addEventListener('click', () => {
+      schedulePreviewUpdate();
+    });
   }
 
   loadStoredSettings();
   if (customSentenceInput && !customSentenceInput.value.trim()) {
     customSentenceInput.value = DEFAULT_SENTENCE;
   }
-  updatePreview();
+  schedulePreviewUpdate();
 }
 
 function updateCopyrightYear() {
