@@ -1,29 +1,29 @@
-function inferRepoUrl() {
+function inferRepositoryUrl() {
   const host = window.location.hostname;
-  const path = window.location.pathname.split('/').filter(Boolean);
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
 
-  if (!host.endsWith('.github.io') || path.length === 0) {
+  if (!host.endsWith('.github.io') || pathSegments.length === 0) {
     return 'https://github.com/your-username/Lingo-Stream';
   }
 
   const owner = host.split('.')[0];
-  const repo = path[0];
+  const repo = pathSegments[0];
   return `https://github.com/${owner}/${repo}`;
 }
 
-function bindRepoLinks(repoUrl) {
-  const nodes = document.querySelectorAll('[data-repo-link]');
-  for (const node of nodes) {
-    node.href = repoUrl;
+function attachRepositoryLinks(repositoryUrl) {
+  const linkNodes = document.querySelectorAll('[data-repo-link]');
+  for (const linkNode of linkNodes) {
+    linkNode.href = repositoryUrl;
   }
 
   const cloneNode = document.getElementById('clone-command');
   if (cloneNode) {
-    cloneNode.textContent = `git clone ${repoUrl}.git`;
+    cloneNode.textContent = `git clone ${repositoryUrl}.git`;
   }
 }
 
-function bindCopyClone() {
+function attachCopyClone() {
   const copyButton = document.getElementById('copy-clone');
   const cloneNode = document.getElementById('clone-command');
   if (!copyButton || !cloneNode) {
@@ -44,9 +44,9 @@ function bindCopyClone() {
   });
 }
 
-function bindReveal() {
-  const nodes = document.querySelectorAll('.reveal');
-  if (nodes.length === 0) {
+function attachRevealAnimation() {
+  const revealNodes = document.querySelectorAll('.reveal');
+  if (revealNodes.length === 0) {
     return;
   }
 
@@ -64,28 +64,30 @@ function bindReveal() {
     { threshold: 0.18 }
   );
 
-  for (const node of nodes) {
-    observer.observe(node);
+  for (const revealNode of revealNodes) {
+    observer.observe(revealNode);
   }
 }
 
-function bindYear() {
+function updateCopyrightYear() {
   const yearNode = document.getElementById('year');
-  if (yearNode) {
-    yearNode.textContent = String(new Date().getFullYear());
+  if (!yearNode) {
+    return;
   }
+
+  yearNode.textContent = String(new Date().getFullYear());
 }
 
-function bootstrap() {
-  const repoUrl = inferRepoUrl();
-  bindRepoLinks(repoUrl);
-  bindCopyClone();
-  bindReveal();
-  bindYear();
+function initializeSite() {
+  const repositoryUrl = inferRepositoryUrl();
+  attachRepositoryLinks(repositoryUrl);
+  attachCopyClone();
+  attachRevealAnimation();
+  updateCopyrightYear();
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+  document.addEventListener('DOMContentLoaded', initializeSite, { once: true });
 } else {
-  bootstrap();
+  initializeSite();
 }

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lingo Stream | Learn While Watching YouTube</title>
+    <meta
+      name="description"
+      content="Lingo Stream is a Chrome extension that injects translated words into YouTube captions so you can build vocabulary while watching videos."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./site.css" />
+  </head>
+  <body>
+    <div class="mesh mesh-a" aria-hidden="true"></div>
+    <div class="mesh mesh-b" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Lingo Stream home">
+        <span class="brand-mark">LS</span>
+        <span class="brand-name">Lingo Stream</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#preview">Preview</a>
+        <a href="#install">Install</a>
+      </nav>
+      <a class="btn btn-primary btn-sm" href="#install">Install</a>
+    </header>
+
+    <main id="top">
+      <section class="hero section reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">Chrome Extension</p>
+          <h1>Turn YouTube subtitles into daily language practice.</h1>
+          <p class="lead">
+            Lingo Stream inserts translated words into captions in real time, so you learn
+            vocabulary naturally while watching content you already enjoy.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#install">Get Lingo Stream</a>
+            <a class="btn btn-ghost" href="#" data-repo-link target="_blank" rel="noopener noreferrer">
+              View GitHub
+            </a>
+          </div>
+          <ul class="hero-meta">
+            <li><strong>Real-time</strong><span>Live subtitle updates</span></li>
+            <li><strong>Configurable</strong><span>Language and % replacement controls</span></li>
+            <li><strong>Lightweight</strong><span>Built for everyday watching</span></li>
+          </ul>
+        </div>
+        <div class="hero-visual" aria-label="Lingo Stream extension preview">
+          <article class="mock-video">
+            <div class="window-dots"><span></span><span></span><span></span></div>
+            <div class="video-canvas">
+              <div class="subtitle-line">
+                I really enjoy learning new <strong>skills (habilidades)</strong> every day.
+              </div>
+            </div>
+            <p>In-video subtitle behavior</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" class="section reveal">
+        <div class="section-head">
+          <p class="eyebrow">Features</p>
+          <h2>Made for practical immersion</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="card">
+            <h3>Inline translation</h3>
+            <p>Captions show words like <code>skills (habilidades)</code> directly in the subtitle stream.</p>
+          </article>
+          <article class="card">
+            <h3>Smart filtering</h3>
+            <p>Skips stopwords and low-value tokens so replacements stay meaningful.</p>
+          </article>
+          <article class="card">
+            <h3>Popup controls</h3>
+            <p>Set provider, target language, and replacement percentage in a clean extension popup.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="preview" class="section reveal">
+        <div class="section-head">
+          <p class="eyebrow">Preview</p>
+          <h2>How the extension looks</h2>
+        </div>
+        <div class="preview-grid">
+          <article class="card popup-mock">
+            <header>
+              <h3>Lingo Stream</h3>
+              <p>Blend translated words into live captions.</p>
+            </header>
+            <div class="popup-field">
+              <label>Translation provider</label>
+              <div class="fake-input">Auto fallback (Recommended)</div>
+            </div>
+            <div class="popup-field">
+              <label>Target language</label>
+              <div class="fake-input">Spanish</div>
+            </div>
+            <div class="popup-field">
+              <label>Replacement percentage</label>
+              <div class="fake-range"><span></span></div>
+              <small>5%</small>
+            </div>
+            <div class="popup-toggle">
+              <span>Enable Lingo Stream</span>
+              <span class="dot"></span>
+            </div>
+            <div class="popup-buttons">
+              <button type="button" class="btn btn-primary btn-block">Save Settings</button>
+              <button type="button" class="btn btn-ghost btn-block">Refresh Captions</button>
+            </div>
+            <p class="caption">Popup UI style preview</p>
+          </article>
+
+          <article class="card">
+            <h3>What changes on YouTube</h3>
+            <p>
+              Captions keep their natural flow, but selected words include translation hints so you
+              can absorb vocabulary while still understanding context.
+            </p>
+            <div class="sample-lines">
+              <p><span class="tag">Original</span> I really enjoy learning new skills every day.</p>
+              <p>
+                <span class="tag tag-good">Lingo Stream</span>
+                I really enjoy learning new <strong>skills (habilidades)</strong> every day.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="section reveal">
+        <div class="section-head">
+          <p class="eyebrow">Install</p>
+          <h2>Install Lingo Stream in Chrome</h2>
+        </div>
+        <div class="install-grid">
+          <article class="card">
+            <h3>Option 1: Download ZIP</h3>
+            <ol>
+              <li>Download this package:</li>
+              <li>
+                <a
+                  class="download-link"
+                  href="https://github.com/user-attachments/files/25672333/Lingo.Stream.v0.0.1.alpha.zip"
+                >
+                  Lingo Stream v0.0.1 alpha.zip
+                </a>
+              </li>
+              <li>Extract the ZIP on your computer.</li>
+              <li>Open <code>chrome://extensions</code>.</li>
+              <li>Enable <strong>Developer mode</strong>.</li>
+              <li>Click <strong>Load unpacked</strong> and select the extracted <code>extension</code> folder.</li>
+            </ol>
+          </article>
+
+          <article class="card">
+            <h3>Option 2: Clone from GitHub</h3>
+            <ol>
+              <li>Clone the repository:</li>
+              <li>
+                <div class="clone-row">
+                  <code id="clone-command">git clone https://github.com/your-username/Lingo-Stream.git</code>
+                  <button id="copy-clone" type="button" class="btn btn-ghost btn-sm">Copy</button>
+                </div>
+              </li>
+              <li>Open <code>chrome://extensions</code> in Chrome.</li>
+              <li>Enable <strong>Developer mode</strong>.</li>
+              <li>Click <strong>Load unpacked</strong> and pick the repo's <code>extension</code> folder.</li>
+            </ol>
+          </article>
+        </div>
+        <aside class="deploy-note">
+          <p>
+            GitHub Pages setup: choose <strong>Deploy from a branch</strong>, then select
+            <strong>main</strong> and folder <strong>/docs</strong>.
+          </p>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        <strong>Lingo Stream</strong> - language learning while watching YouTube -
+        <a href="#" data-repo-link target="_blank" rel="noopener noreferrer">GitHub</a>
+      </p>
+      <p class="muted">Copyright <span id="year"></span> Lingo Stream</p>
+    </footer>
+
+    <script src="./site.js"></script>
+  </body>
+</html>
