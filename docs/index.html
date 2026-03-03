@@ -255,7 +255,7 @@
         <div class="screen-inner quiz-layout">
           <div class="quiz-copy" data-reveal>
             <p class="eyebrow">Quiz Mode</p>
-            <h2>Practice recent vocabulary with matching rounds</h2>
+            <h2>Practice recent vocabulary with 5-word matching rounds</h2>
             <p>
               Lingo Stream can turn your last hour of translated words into a focused matching drill.
               This keeps review short and contextual, right after watching.
@@ -266,8 +266,8 @@
                 <span>Uses words translated in the previous 60 minutes.</span>
               </article>
               <article class="quiz-point">
-                <strong>Fast rounds</strong>
-                <span>Short matching sets designed for quick repetition.</span>
+                <strong>5-word rounds</strong>
+                <span>Each round uses exactly five pairs for quick daily repetition.</span>
               </article>
               <article class="quiz-point">
                 <strong>Live scoring</strong>
@@ -303,19 +303,27 @@
         <div class="screen-inner install-layout">
           <div class="install-copy" data-reveal>
             <p class="eyebrow">Install</p>
-            <h2>Install Lingo Stream in Chrome in minutes</h2>
+            <h2>Install Lingo Stream v<span data-release-version>1.0.0</span></h2>
+            <div class="release-card">
+              <p><span>Release</span> <strong>v<span data-release-version>1.0.0</span></strong></p>
+              <p><span>Channel</span> <strong data-release-channel>Full Release</strong></p>
+              <p><span>Package</span> <strong data-release-package>Lingo.Stream.1.0.0.Release.zip</strong></p>
+            </div>
             <ol>
               <li>Download the packed ZIP package below.</li>
               <li>Extract the ZIP file.</li>
               <li>Open <code>chrome://extensions</code>.</li>
               <li>Enable <strong>Developer mode</strong>.</li>
-              <li>Click <strong>Load packed</strong> and choose the packaged extension file from the extracted ZIP.</li>
+              <li>Click <strong>Load unpacked</strong> and select the extracted extension folder.</li>
             </ol>
             <a
               class="download-link"
-              href="https://github.com/user-attachments/files/25672333/Lingo.Stream.v0.0.1.alpha.zip"
+              href="https://github.com/UnoxyRich/Lingo-Stream/releases/download/Full-Release/Lingo.Stream.1.0.0.Release.zip"
+              data-release-download-link
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              Lingo Stream v0.0.1 alpha.zip
+              Download <span data-release-package>Lingo.Stream.1.0.0.Release.zip</span>
             </a>
             <p>
               Need other builds? Check all downloadable options in
@@ -325,9 +333,19 @@
           <div class="install-notes" data-reveal data-delay="120">
             <img class="logo-large" src="./logo.svg" alt="Lingo Stream logo" />
             <p>
-              Download options are published per release (alpha/beta/stable) in the Releases tab.
+              Current stable package: <strong>v<span data-release-version>1.0.0</span></strong>
+              (<span data-release-channel>Full Release</span>).
             </p>
-            <a class="btn btn-primary" href="#" data-releases-link target="_blank" rel="noopener noreferrer">
+            <a
+              class="btn btn-primary"
+              href="https://github.com/UnoxyRich/Lingo-Stream/releases/download/Full-Release/Lingo.Stream.1.0.0.Release.zip"
+              data-release-download-link
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download v1.0.0 ZIP
+            </a>
+            <a class="btn btn-ghost" href="#" data-releases-link target="_blank" rel="noopener noreferrer">
               Open Releases
             </a>
             <a class="btn btn-ghost" href="#" data-repo-link target="_blank" rel="noopener noreferrer">

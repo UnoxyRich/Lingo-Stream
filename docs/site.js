@@ -3,7 +3,7 @@ function inferRepositoryUrl() {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
 
   if (!host.endsWith('.github.io') || pathSegments.length === 0) {
-    return 'https://github.com/your-username/Lingo-Stream';
+    return 'https://github.com/UnoxyRich/Lingo-Stream';
   }
 
   const owner = host.split('.')[0];
@@ -12,6 +12,12 @@ function inferRepositoryUrl() {
 }
 
 const DEFAULT_SENTENCE = 'I really enjoy learning new skills every day.';
+const CURRENT_RELEASE = {
+  version: '1.0.0',
+  channel: 'Full Release',
+  packageName: 'Lingo.Stream.1.0.0.Release.zip',
+  downloadUrl: 'https://github.com/UnoxyRich/Lingo-Stream/releases/download/Full-Release/Lingo.Stream.1.0.0.Release.zip'
+};
 const WORD_PRIORITY = [
   'vocabulary',
   'language',
@@ -522,6 +528,28 @@ function attachReleaseLinks(repositoryUrl) {
   const linkNodes = document.querySelectorAll('[data-releases-link]');
   for (const linkNode of linkNodes) {
     linkNode.href = releasesUrl;
+  }
+}
+
+function attachCurrentReleaseInfo() {
+  const versionNodes = document.querySelectorAll('[data-release-version]');
+  for (const node of versionNodes) {
+    node.textContent = CURRENT_RELEASE.version;
+  }
+
+  const channelNodes = document.querySelectorAll('[data-release-channel]');
+  for (const node of channelNodes) {
+    node.textContent = CURRENT_RELEASE.channel;
+  }
+
+  const packageNodes = document.querySelectorAll('[data-release-package]');
+  for (const node of packageNodes) {
+    node.textContent = CURRENT_RELEASE.packageName;
+  }
+
+  const downloadNodes = document.querySelectorAll('[data-release-download-link]');
+  for (const node of downloadNodes) {
+    node.href = CURRENT_RELEASE.downloadUrl;
   }
 }
 
@@ -1389,6 +1417,7 @@ function updateCopyrightYear() {
 
 function initializeSite() {
   const repositoryUrl = inferRepositoryUrl();
+  attachCurrentReleaseInfo();
   attachRepositoryLinks(repositoryUrl);
   attachReleaseLinks(repositoryUrl);
   attachRevealAnimation();

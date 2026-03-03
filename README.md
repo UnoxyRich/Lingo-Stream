@@ -10,6 +10,11 @@ Original:
 Lingo Stream output (Spanish):
 `I really enjoy (gusto) learning new skills every day.`
 
+## Current Release
+
+- `v1.0.0` (`Full-Release`)
+- Download: [Lingo.Stream.1.0.0.Release.zip](https://github.com/UnoxyRich/Lingo-Stream/releases/download/Full-Release/Lingo.Stream.1.0.0.Release.zip)
+
 ## What It Does
 
 - Observes YouTube caption updates in real time
@@ -17,6 +22,8 @@ Lingo Stream output (Spanish):
 - Replaces a configurable percentage of meaningful words
 - Uses free translation providers with fallback support
 - Caches translation hits and misses to reduce repeated requests
+- Includes a dedicated quiz page with 5-word matching rounds
+- Tracks quiz score, progress, and accuracy during review rounds
 - Includes popup health checks:
   - content script connection status
   - last translation success timestamp/provider/count
@@ -76,6 +83,7 @@ Lingo Stream output (Spanish):
 5. If needed, click **Refresh Captions**.
 6. Use **Recheck Health** in the popup to verify runtime status.
 7. Use **Export Vocabulary** to download saved entries as CSV.
+8. Use **Quiz** in the popup to practice recent words in 5-word rounds.
 
 ## Development
 

@@ -870,6 +870,33 @@ h3 {
   padding-left: 18px;
 }
 
+.release-card {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(62, 155, 95, 0.22);
+  border-radius: 14px;
+  background: var(--panel-soft);
+  display: grid;
+  gap: 8px;
+}
+
+.release-card p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.release-card p span {
+  font-weight: 700;
+}
+
+.release-card p strong {
+  color: var(--accent-strong);
+}
+
 .install-copy li + li {
   margin-top: 8px;
 }
@@ -885,9 +912,16 @@ code {
 
 .download-link {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(62, 155, 95, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: rgba(62, 155, 95, 0.08);
   margin-top: 12px;
   color: var(--accent-strong);
   font-weight: 800;
+  text-decoration: none;
 }
 
 .install-notes {
@@ -906,6 +940,13 @@ code {
   margin: 14px 0;
   color: var(--muted);
   line-height: 1.58;
+}
+
+.install-notes .btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 10px;
 }
 
 .footer {
