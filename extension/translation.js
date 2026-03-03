@@ -8,7 +8,7 @@ const LAST_TRANSLATION_SUCCESS_AT_KEY = 'lastTranslationSuccessAt';
 const LAST_TRANSLATION_SUCCESS_PROVIDER_KEY = 'lastTranslationSuccessProvider';
 const LAST_TRANSLATION_SUCCESS_COUNT_KEY = 'lastTranslationSuccessCount';
 const VOCABULARY_ENTRIES_KEY = 'vocabularyEntries';
-const MAX_VOCABULARY_ENTRIES = 500;
+const VOCABULARY_QUIZ_BUCKETS_KEY = 'vocabularyQuizBuckets';
 const CACHE_PROVIDER_LABEL = 'cache';
 const UNKNOWN_PROVIDER_LABEL = 'unknown';
 let vocabularyPersistPromise = Promise.resolve();
@@ -173,12 +173,134 @@ function normalizeVocabularyEntry(entry) {
   };
 }
 
+function mergeVocabularyEntries(baseEntry, incomingEntry) {
+  return {
+    ...baseEntry,
+    provider: (
+      incomingEntry.provider === CACHE_PROVIDER_LABEL ||
+      incomingEntry.provider === UNKNOWN_PROVIDER_LABEL
+    )
+      ? baseEntry.provider
+      : incomingEntry.provider,
+    firstSeenAt: Math.min(baseEntry.firstSeenAt, incomingEntry.firstSeenAt),
+    lastSeenAt: Math.max(baseEntry.lastSeenAt, incomingEntry.lastSeenAt),
+    count: baseEntry.count + incomingEntry.count
+  };
+}
+
+function normalizeQuizBucketEntry(entry) {
+  const normalized = normalizeVocabularyEntry(entry);
+  if (!normalized) {
+    return null;
+  }
+
+  const wrongCount = Number.isFinite(entry?.wrongCount)
+    ? Math.max(0, Math.floor(entry.wrongCount))
+    : 0;
+  const lastQuizAt = Number.isFinite(entry?.lastQuizAt) ? entry.lastQuizAt : null;
+
+  return {
+    ...normalized,
+    wrongCount,
+    lastQuizAt
+  };
+}
+
+function mergeQuizBucketEntries(baseEntry, incomingEntry) {
+  const merged = mergeVocabularyEntries(baseEntry, incomingEntry);
+  merged.wrongCount = Math.max(baseEntry.wrongCount ?? 0, incomingEntry.wrongCount ?? 0);
+
+  const baseQuizAt = Number.isFinite(baseEntry.lastQuizAt) ? baseEntry.lastQuizAt : null;
+  const incomingQuizAt = Number.isFinite(incomingEntry.lastQuizAt) ? incomingEntry.lastQuizAt : null;
+  merged.lastQuizAt = Number.isFinite(baseQuizAt) && Number.isFinite(incomingQuizAt)
+    ? Math.max(baseQuizAt, incomingQuizAt)
+    : (baseQuizAt ?? incomingQuizAt);
+  return merged;
+}
+
+function upsertBucketEntry(map, entry) {
+  const key = createVocabularyKey(entry);
+  const existing = map.get(key);
+  if (!existing) {
+    map.set(key, entry);
+    return;
+  }
+
+  map.set(key, mergeQuizBucketEntries(existing, entry));
+}
+
+function sortVocabularyEntriesByLastSeen(entries) {
+  return [...entries].sort((left, right) => right.lastSeenAt - left.lastSeenAt);
+}
+
+function normalizeQuizBuckets(rawBuckets, fallbackEntries = []) {
+  const notQuizzedMap = new Map();
+  const correctMap = new Map();
+  const incorrectMap = new Map();
+
+  const rawNotQuizzed = Array.isArray(rawBuckets?.notQuizzed) ? rawBuckets.notQuizzed : [];
+  const rawCorrect = Array.isArray(rawBuckets?.correct) ? rawBuckets.correct : [];
+  const rawIncorrect = Array.isArray(rawBuckets?.incorrect) ? rawBuckets.incorrect : [];
+
+  for (const entry of rawNotQuizzed) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(notQuizzedMap, normalized);
+  }
+
+  for (const entry of rawCorrect) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(correctMap, normalized);
+  }
+
+  for (const entry of rawIncorrect) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(incorrectMap, normalized);
+  }
+
+  for (const entry of fallbackEntries) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+
+    const key = createVocabularyKey(normalized);
+    if (correctMap.has(key) || incorrectMap.has(key)) {
+      continue;
+    }
+    upsertBucketEntry(notQuizzedMap, normalized);
+  }
+
+  for (const key of correctMap.keys()) {
+    notQuizzedMap.delete(key);
+    incorrectMap.delete(key);
+  }
+
+  for (const key of incorrectMap.keys()) {
+    notQuizzedMap.delete(key);
+  }
+
+  return {
+    notQuizzed: sortVocabularyEntriesByLastSeen(Array.from(notQuizzedMap.values())),
+    correct: sortVocabularyEntriesByLastSeen(Array.from(correctMap.values())),
+    incorrect: sortVocabularyEntriesByLastSeen(Array.from(incorrectMap.values()))
+  };
+}
+
 async function persistVocabularyEntries(entriesToMerge) {
   if (!hasLocalStorageApi() || !Array.isArray(entriesToMerge) || entriesToMerge.length === 0) {
     return;
   }
 
-  const stored = await getLocalFromStorage([VOCABULARY_ENTRIES_KEY]);
+  const stored = await getLocalFromStorage([VOCABULARY_ENTRIES_KEY, VOCABULARY_QUIZ_BUCKETS_KEY]);
   const existingEntries = Array.isArray(stored[VOCABULARY_ENTRIES_KEY])
     ? stored[VOCABULARY_ENTRIES_KEY]
     : [];
@@ -205,27 +327,68 @@ async function persistVocabularyEntries(entriesToMerge) {
       continue;
     }
 
-    const nextProvider = (
-      normalized.provider === CACHE_PROVIDER_LABEL ||
-      normalized.provider === UNKNOWN_PROVIDER_LABEL
-    )
-      ? existing.provider
-      : normalized.provider;
-
-    byKey.set(key, {
-      ...existing,
-      provider: nextProvider || existing.provider || UNKNOWN_PROVIDER_LABEL,
-      firstSeenAt: Math.min(existing.firstSeenAt, normalized.firstSeenAt),
-      lastSeenAt: Math.max(existing.lastSeenAt, normalized.lastSeenAt),
-      count: existing.count + normalized.count
-    });
+    byKey.set(key, mergeVocabularyEntries(existing, normalized));
   }
 
-  const merged = Array.from(byKey.values())
-    .sort((left, right) => right.lastSeenAt - left.lastSeenAt)
-    .slice(0, MAX_VOCABULARY_ENTRIES);
+  const merged = sortVocabularyEntriesByLastSeen(Array.from(byKey.values()));
+  const normalizedBuckets = normalizeQuizBuckets(stored[VOCABULARY_QUIZ_BUCKETS_KEY], existingEntries);
 
-  await setLocalStorage({ [VOCABULARY_ENTRIES_KEY]: merged });
+  const notQuizzedMap = new Map(
+    normalizedBuckets.notQuizzed.map((entry) => [createVocabularyKey(entry), entry])
+  );
+  const correctMap = new Map(
+    normalizedBuckets.correct.map((entry) => [createVocabularyKey(entry), entry])
+  );
+  const incorrectMap = new Map(
+    normalizedBuckets.incorrect.map((entry) => [createVocabularyKey(entry), entry])
+  );
+
+  for (const entry of entriesToMerge) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+
+    const key = createVocabularyKey(normalized);
+    if (correctMap.has(key)) {
+      notQuizzedMap.delete(key);
+      incorrectMap.delete(key);
+      continue;
+    }
+
+    if (incorrectMap.has(key)) {
+      incorrectMap.set(key, mergeQuizBucketEntries(incorrectMap.get(key), normalized));
+      continue;
+    }
+
+    const existing = notQuizzedMap.get(key);
+    if (!existing) {
+      notQuizzedMap.set(key, normalized);
+      continue;
+    }
+
+    notQuizzedMap.set(key, mergeQuizBucketEntries(existing, normalized));
+  }
+
+  for (const key of correctMap.keys()) {
+    notQuizzedMap.delete(key);
+    incorrectMap.delete(key);
+  }
+
+  for (const key of incorrectMap.keys()) {
+    notQuizzedMap.delete(key);
+  }
+
+  const nextBuckets = {
+    notQuizzed: sortVocabularyEntriesByLastSeen(Array.from(notQuizzedMap.values())),
+    correct: sortVocabularyEntriesByLastSeen(Array.from(correctMap.values())),
+    incorrect: sortVocabularyEntriesByLastSeen(Array.from(incorrectMap.values()))
+  };
+
+  await setLocalStorage({
+    [VOCABULARY_ENTRIES_KEY]: merged,
+    [VOCABULARY_QUIZ_BUCKETS_KEY]: nextBuckets
+  });
 }
 
 function queueVocabularyPersistence(entriesToMerge) {

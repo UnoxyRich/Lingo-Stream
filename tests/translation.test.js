@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 globalThis.window = globalThis;
 await import('../extension/translation.js');
 
-function createChromeMock({ storageItems = {}, response = null, runtimeErrorMessage = '' } = {}) {
-  const localStorageState = {};
+function createChromeMock({
+  storageItems = {},
+  localStorageItems = {},
+  response = null,
+  runtimeErrorMessage = ''
+} = {}) {
+  const localStorageState = { ...localStorageItems };
 
   return {
     storage: {
@@ -332,6 +337,61 @@ describe('translation bridge layer', () => {
         count: 2
       })
     );
+
+    const buckets = globalThis.chrome._localStorageState.vocabularyQuizBuckets;
+    expect(buckets).toEqual(
+      expect.objectContaining({
+        notQuizzed: expect.any(Array),
+        correct: expect.any(Array),
+        incorrect: expect.any(Array)
+      })
+    );
+    expect(buckets.notQuizzed.length).toBe(1);
+    expect(buckets.correct.length).toBe(0);
+    expect(buckets.incorrect.length).toBe(0);
+  });
+
+  it('does not re-add words to notQuizzed when they already exist in correct bucket', async () => {
+    globalThis.chrome = createChromeMock({
+      storageItems: {
+        saveVocabulary: true,
+        sourceLanguage: 'en',
+        targetLanguage: 'es'
+      },
+      localStorageItems: {
+        vocabularyQuizBuckets: {
+          notQuizzed: [],
+          correct: [
+            {
+              source: 'hello',
+              translation: 'hola',
+              sourceLanguage: 'en',
+              targetLanguage: 'es',
+              provider: 'google',
+              count: 1,
+              firstSeenAt: Date.now() - 1000,
+              lastSeenAt: Date.now() - 1000
+            }
+          ],
+          incorrect: []
+        }
+      },
+      response: {
+        ok: true,
+        translations: { hello: 'hola' },
+        meta: {
+          providerByWord: { hello: 'mymemory' },
+          failedProvidersByWord: {}
+        }
+      }
+    });
+
+    await window.translateWords(['hello']);
+    await flushStorageWrites();
+
+    const buckets = globalThis.chrome._localStorageState.vocabularyQuizBuckets;
+    expect(buckets.correct.length).toBe(1);
+    expect(buckets.notQuizzed.length).toBe(0);
   });
 
   it('persists cached vocabulary hits even when new misses fail in bridge', async () => {

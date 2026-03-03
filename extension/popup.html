@@ -291,6 +291,7 @@
       }
 
       #recheckHealthButton,
+      #importVocabularyButton,
       #exportVocabularyButton,
       #clearVocabularyButton {
         flex: 1;
@@ -552,6 +553,9 @@
         <details class="health-panel span-2">
           <summary>Vocabulary</summary>
           <p id="vocabularyStatus" class="status health-line" role="status" aria-live="polite">Saved words: 0</p>
+          <p id="quizBucketStatus" class="status health-line" role="status" aria-live="polite">
+            Not quizzed: 0 | Correct: 0 | Incorrect: 0
+          </p>
           <div class="vocabulary-toolbar">
             <input
               id="vocabularyFilterInput"
@@ -573,8 +577,18 @@
               <tbody id="vocabularyTableBody"></tbody>
             </table>
           </div>
+          <input
+            id="importVocabularyInput"
+            class="hidden"
+            type="file"
+            accept=".csv,.json,text/csv,application/json"
+            aria-label="Import vocabulary file"
+          />
           <div class="button-row">
+            <button id="importVocabularyButton" type="button">Import CSV/JSON</button>
             <button id="exportVocabularyButton" type="button">Export Vocabulary</button>
+          </div>
+          <div class="button-row">
             <button id="clearVocabularyButton" type="button">Clear Saved</button>
           </div>
         </details>

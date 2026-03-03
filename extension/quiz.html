@@ -67,9 +67,24 @@
             </article>
           </div>
 
+          <div class="bucket-kpis">
+            <article class="bucket-kpi">
+              <span>Not Quizzed</span>
+              <strong id="notQuizzedValue">0</strong>
+            </article>
+            <article class="bucket-kpi">
+              <span>Answered Correctly</span>
+              <strong id="answeredCorrectValue">0</strong>
+            </article>
+            <article class="bucket-kpi">
+              <span>Answered Incorrectly</span>
+              <strong id="answeredIncorrectValue">0</strong>
+            </article>
+          </div>
+
           <p class="hero-note">
-            Each round always uses 5 recent saved words from the past hour. If this page is empty, watch captions
-            with saving enabled and tap <strong>Refresh</strong>.
+            Quiz picks random words from <strong>Not Quizzed</strong> and a smaller share from
+            <strong>Answered Incorrectly</strong>. Words in <strong>Answered Correctly</strong> are skipped in future rounds.
           </p>
         </section>
 
@@ -109,8 +124,8 @@
       </div>
 
       <section id="emptyState" class="empty-state hidden" data-reveal data-delay="140">
-        <h2>Not enough recent words yet</h2>
-        <p>You need at least 5 translated words saved in the past hour to start matching.</p>
+        <h2>Not enough quiz words yet</h2>
+        <p>You need at least 5 words in Not Quizzed or Answered Incorrectly to start a round.</p>
       </section>
     </main>
 

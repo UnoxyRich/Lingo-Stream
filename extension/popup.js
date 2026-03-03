@@ -13,7 +13,8 @@ const LOCAL_STORAGE_KEYS = {
   lastTranslationSuccessAt: 'lastTranslationSuccessAt',
   lastTranslationSuccessProvider: 'lastTranslationSuccessProvider',
   lastTranslationSuccessCount: 'lastTranslationSuccessCount',
-  vocabularyEntries: 'vocabularyEntries'
+  vocabularyEntries: 'vocabularyEntries',
+  vocabularyQuizBuckets: 'vocabularyQuizBuckets'
 };
 const LOG_POLL_INTERVAL_MS = 500;
 const SUPPORTED_PROVIDERS = new Set(['auto', 'google', 'libre', 'apertium', 'mymemory']);
@@ -37,10 +38,13 @@ const contentHealthStatus = document.getElementById('contentHealthStatus');
 const translationHealthStatus = document.getElementById('translationHealthStatus');
 const recheckHealthButton = document.getElementById('recheckHealthButton');
 const vocabularyStatus = document.getElementById('vocabularyStatus');
+const quizBucketStatus = document.getElementById('quizBucketStatus');
 const vocabularyFilterInput = document.getElementById('vocabularyFilterInput');
 const vocabularyEmptyState = document.getElementById('vocabularyEmptyState');
 const vocabularyList = document.getElementById('vocabularyList');
 const vocabularyTableBody = document.getElementById('vocabularyTableBody');
+const importVocabularyButton = document.getElementById('importVocabularyButton');
+const importVocabularyInput = document.getElementById('importVocabularyInput');
 const exportVocabularyButton = document.getElementById('exportVocabularyButton');
 const clearVocabularyButton = document.getElementById('clearVocabularyButton');
 const debugEnabledInput = document.getElementById('debugEnabled');
@@ -49,6 +53,11 @@ const logPanel = document.getElementById('logPanel');
 
 let logPollTimer = null;
 let currentVocabularyEntries = [];
+let currentQuizBuckets = {
+  notQuizzed: [],
+  correct: [],
+  incorrect: []
+};
 
 function updateReplacementLabel(value) {
   replacementPercentageValue.textContent = `${value}%`;
@@ -211,6 +220,40 @@ function renderTranslationHealth(items) {
   );
 }
 
+function parseTimestampCandidate(value) {
+  if (Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    const numeric = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+
+    const parsed = Date.parse(trimmed);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseCountCandidate(value) {
+  if (Number.isFinite(value)) {
+    return Math.max(1, Math.floor(value));
+  }
+
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (Number.isFinite(parsed)) {
+    return Math.max(1, parsed);
+  }
+
+  return 1;
+}
+
 function normalizeVocabularyEntry(entry) {
   if (!entry || typeof entry !== 'object') {
     return null;
@@ -240,9 +283,144 @@ function normalizeVocabularyEntry(entry) {
     sourceLanguage,
     targetLanguage,
     provider: typeof entry.provider === 'string' ? entry.provider.trim() : '',
-    count: Number.isFinite(entry.count) ? Math.max(1, Math.floor(entry.count)) : 1,
-    firstSeenAt: Number.isFinite(entry.firstSeenAt) ? entry.firstSeenAt : null,
-    lastSeenAt: Number.isFinite(entry.lastSeenAt) ? entry.lastSeenAt : null
+    count: parseCountCandidate(entry.count),
+    firstSeenAt: parseTimestampCandidate(entry.firstSeenAt),
+    lastSeenAt: parseTimestampCandidate(entry.lastSeenAt)
+  };
+}
+
+function createVocabularyKey(entry) {
+  return [
+    entry.source.toLowerCase(),
+    entry.translation.toLowerCase(),
+    entry.sourceLanguage.toLowerCase(),
+    entry.targetLanguage.toLowerCase()
+  ].join('|');
+}
+
+function mergeVocabularyEntries(baseEntry, incomingEntry) {
+  const merged = {
+    ...baseEntry,
+    provider: incomingEntry.provider || baseEntry.provider,
+    count: parseCountCandidate(baseEntry.count) + parseCountCandidate(incomingEntry.count),
+    firstSeenAt: null,
+    lastSeenAt: null
+  };
+
+  const firstSeenCandidates = [baseEntry.firstSeenAt, incomingEntry.firstSeenAt].filter((value) => Number.isFinite(value));
+  merged.firstSeenAt = firstSeenCandidates.length > 0 ? Math.min(...firstSeenCandidates) : null;
+
+  const lastSeenCandidates = [baseEntry.lastSeenAt, incomingEntry.lastSeenAt].filter((value) => Number.isFinite(value));
+  merged.lastSeenAt = lastSeenCandidates.length > 0 ? Math.max(...lastSeenCandidates) : null;
+
+  return merged;
+}
+
+function normalizeQuizBucketEntry(entry) {
+  const normalized = normalizeVocabularyEntry(entry);
+  if (!normalized) {
+    return null;
+  }
+
+  const wrongCountRaw = Number.parseInt(String(entry?.wrongCount ?? 0), 10);
+  const wrongCount = Number.isFinite(wrongCountRaw) ? Math.max(0, wrongCountRaw) : 0;
+  const lastQuizAt = parseTimestampCandidate(entry?.lastQuizAt);
+
+  return {
+    ...normalized,
+    wrongCount,
+    lastQuizAt
+  };
+}
+
+function sortEntriesByRecency(entries) {
+  return [...entries].sort((left, right) => {
+    const leftLast = Number.isFinite(left.lastSeenAt) ? left.lastSeenAt : 0;
+    const rightLast = Number.isFinite(right.lastSeenAt) ? right.lastSeenAt : 0;
+    return rightLast - leftLast;
+  });
+}
+
+function upsertBucketEntry(map, entry) {
+  const key = createVocabularyKey(entry);
+  const existing = map.get(key);
+  if (!existing) {
+    map.set(key, entry);
+    return;
+  }
+
+  const merged = mergeVocabularyEntries(existing, entry);
+  merged.wrongCount = Math.max(
+    Number.isFinite(existing.wrongCount) ? existing.wrongCount : 0,
+    Number.isFinite(entry.wrongCount) ? entry.wrongCount : 0
+  );
+  const existingQuiz = Number.isFinite(existing.lastQuizAt) ? existing.lastQuizAt : null;
+  const nextQuiz = Number.isFinite(entry.lastQuizAt) ? entry.lastQuizAt : null;
+  merged.lastQuizAt = Number.isFinite(existingQuiz) && Number.isFinite(nextQuiz)
+    ? Math.max(existingQuiz, nextQuiz)
+    : (existingQuiz ?? nextQuiz);
+  map.set(key, merged);
+}
+
+function normalizeQuizBuckets(rawBuckets, fallbackEntries = []) {
+  const notQuizzedMap = new Map();
+  const correctMap = new Map();
+  const incorrectMap = new Map();
+
+  const rawNotQuizzed = Array.isArray(rawBuckets?.notQuizzed) ? rawBuckets.notQuizzed : [];
+  const rawCorrect = Array.isArray(rawBuckets?.correct) ? rawBuckets.correct : [];
+  const rawIncorrect = Array.isArray(rawBuckets?.incorrect) ? rawBuckets.incorrect : [];
+
+  for (const entry of rawNotQuizzed) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(notQuizzedMap, normalized);
+  }
+
+  for (const entry of rawCorrect) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(correctMap, normalized);
+  }
+
+  for (const entry of rawIncorrect) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(incorrectMap, normalized);
+  }
+
+  for (const entry of fallbackEntries) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+
+    const key = createVocabularyKey(normalized);
+    if (correctMap.has(key) || incorrectMap.has(key)) {
+      continue;
+    }
+    upsertBucketEntry(notQuizzedMap, normalized);
+  }
+
+  for (const key of correctMap.keys()) {
+    notQuizzedMap.delete(key);
+    incorrectMap.delete(key);
+  }
+
+  for (const key of incorrectMap.keys()) {
+    notQuizzedMap.delete(key);
+  }
+
+  return {
+    notQuizzed: sortEntriesByRecency(Array.from(notQuizzedMap.values())),
+    correct: sortEntriesByRecency(Array.from(correctMap.values())),
+    incorrect: sortEntriesByRecency(Array.from(incorrectMap.values()))
   };
 }
 
@@ -257,9 +435,21 @@ function getVocabularyEntriesFromItems(items) {
     .filter((entry) => entry !== null);
 }
 
-function renderVocabularyStatus(entries) {
+function renderVocabularyStatus(entries, buckets = currentQuizBuckets) {
   const count = Array.isArray(entries) ? entries.length : 0;
   setStatusElement(vocabularyStatus, `Saved words: ${count}`, count > 0 ? 'ok' : 'neutral');
+
+  if (quizBucketStatus) {
+    const notQuizzedCount = Array.isArray(buckets?.notQuizzed) ? buckets.notQuizzed.length : 0;
+    const correctCount = Array.isArray(buckets?.correct) ? buckets.correct.length : 0;
+    const incorrectCount = Array.isArray(buckets?.incorrect) ? buckets.incorrect.length : 0;
+    setStatusElement(
+      quizBucketStatus,
+      `Not quizzed: ${notQuizzedCount} | Correct: ${correctCount} | Incorrect: ${incorrectCount}`,
+      'neutral'
+    );
+  }
+
   exportVocabularyButton.disabled = count === 0;
   clearVocabularyButton.disabled = count === 0;
 }
@@ -319,9 +509,10 @@ function renderVocabularyList(entries) {
     : 'No saved words yet.';
 }
 
-function renderVocabulary(entries) {
+function renderVocabulary(entries, buckets = currentQuizBuckets) {
   currentVocabularyEntries = Array.isArray(entries) ? entries : [];
-  renderVocabularyStatus(currentVocabularyEntries);
+  currentQuizBuckets = normalizeQuizBuckets(buckets, currentVocabularyEntries);
+  renderVocabularyStatus(currentVocabularyEntries, currentQuizBuckets);
   renderVocabularyList(currentVocabularyEntries);
 }
 
@@ -372,6 +563,212 @@ function buildVocabularyCsv(entries) {
   }
 
   return rows.join('\n');
+}
+
+function mergeVocabularyEntryArrays(baseEntries, incomingEntries) {
+  const byKey = new Map();
+
+  for (const entry of baseEntries) {
+    const normalized = normalizeVocabularyEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    byKey.set(createVocabularyKey(normalized), normalized);
+  }
+
+  for (const entry of incomingEntries) {
+    const normalized = normalizeVocabularyEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+
+    const key = createVocabularyKey(normalized);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, normalized);
+      continue;
+    }
+
+    byKey.set(key, mergeVocabularyEntries(existing, normalized));
+  }
+
+  return sortEntriesByRecency(Array.from(byKey.values()));
+}
+
+function ingestEntriesIntoQuizBuckets(rawBuckets, incomingEntries, fallbackEntries = []) {
+  const normalizedBuckets = normalizeQuizBuckets(rawBuckets, fallbackEntries);
+  const notQuizzedMap = new Map(
+    normalizedBuckets.notQuizzed.map((entry) => [createVocabularyKey(entry), entry])
+  );
+  const correctMap = new Map(
+    normalizedBuckets.correct.map((entry) => [createVocabularyKey(entry), entry])
+  );
+  const incorrectMap = new Map(
+    normalizedBuckets.incorrect.map((entry) => [createVocabularyKey(entry), entry])
+  );
+
+  for (const rawEntry of incomingEntries) {
+    const entry = normalizeQuizBucketEntry(rawEntry);
+    if (!entry) {
+      continue;
+    }
+
+    const key = createVocabularyKey(entry);
+    if (correctMap.has(key)) {
+      notQuizzedMap.delete(key);
+      incorrectMap.delete(key);
+      continue;
+    }
+
+    if (incorrectMap.has(key)) {
+      const mergedIncorrect = mergeVocabularyEntries(incorrectMap.get(key), entry);
+      mergedIncorrect.wrongCount = Math.max(
+        Number.isFinite(incorrectMap.get(key)?.wrongCount) ? incorrectMap.get(key).wrongCount : 0,
+        Number.isFinite(entry.wrongCount) ? entry.wrongCount : 0
+      );
+      mergedIncorrect.lastQuizAt = Number.isFinite(incorrectMap.get(key)?.lastQuizAt)
+        ? incorrectMap.get(key).lastQuizAt
+        : (Number.isFinite(entry.lastQuizAt) ? entry.lastQuizAt : null);
+      incorrectMap.set(key, mergedIncorrect);
+      continue;
+    }
+
+    const existingNotQuizzed = notQuizzedMap.get(key);
+    if (!existingNotQuizzed) {
+      notQuizzedMap.set(key, entry);
+      continue;
+    }
+
+    notQuizzedMap.set(key, mergeVocabularyEntries(existingNotQuizzed, entry));
+  }
+
+  for (const key of correctMap.keys()) {
+    notQuizzedMap.delete(key);
+    incorrectMap.delete(key);
+  }
+
+  for (const key of incorrectMap.keys()) {
+    notQuizzedMap.delete(key);
+  }
+
+  return {
+    notQuizzed: sortEntriesByRecency(Array.from(notQuizzedMap.values())),
+    correct: sortEntriesByRecency(Array.from(correctMap.values())),
+    incorrect: sortEntriesByRecency(Array.from(incorrectMap.values()))
+  };
+}
+
+function parseCsvRows(csvText) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < csvText.length; index += 1) {
+    const char = csvText[index];
+    const nextChar = csvText[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      row.push(cell);
+      cell = '';
+      continue;
+    }
+
+    if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        index += 1;
+      }
+      row.push(cell);
+      cell = '';
+      if (row.some((value) => String(value).trim() !== '')) {
+        rows.push(row);
+      }
+      row = [];
+      continue;
+    }
+
+    cell += char;
+  }
+
+  row.push(cell);
+  if (row.some((value) => String(value).trim() !== '')) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function normalizeImportHeader(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+}
+
+function parseVocabularyCsv(csvText) {
+  const rows = parseCsvRows(csvText);
+  if (rows.length < 2) {
+    return [];
+  }
+
+  const headerIndexMap = new Map();
+  rows[0].forEach((cell, index) => {
+    headerIndexMap.set(normalizeImportHeader(cell), index);
+  });
+
+  const getCell = (row, key) => {
+    const index = headerIndexMap.get(key);
+    return typeof index === 'number' ? row[index] : '';
+  };
+
+  const parsedEntries = [];
+  for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex];
+    const sourceLanguage = getCell(row, 'sourcelanguage') || getCell(row, 'sl') || 'en';
+    const targetLanguage = getCell(row, 'targetlanguage') || getCell(row, 'tl') || 'es';
+    const entry = normalizeVocabularyEntry({
+      source: getCell(row, 'source'),
+      translation: getCell(row, 'translation'),
+      sourceLanguage,
+      targetLanguage,
+      provider: getCell(row, 'provider'),
+      count: getCell(row, 'count'),
+      firstSeenAt: getCell(row, 'firstseenat'),
+      lastSeenAt: getCell(row, 'lastseenat')
+    });
+    if (entry) {
+      parsedEntries.push(entry);
+    }
+  }
+
+  return parsedEntries;
+}
+
+function parseVocabularyJson(jsonText) {
+  const parsed = JSON.parse(jsonText);
+  const sourceArray = Array.isArray(parsed)
+    ? parsed
+    : (Array.isArray(parsed?.vocabularyEntries) ? parsed.vocabularyEntries : []);
+
+  const entries = [];
+  for (const candidate of sourceArray) {
+    const normalized = normalizeVocabularyEntry(candidate);
+    if (normalized) {
+      entries.push(normalized);
+    }
+  }
+
+  return entries;
 }
 
 function triggerAnchorDownload(url, filename) {
@@ -442,8 +839,62 @@ async function loadTranslationHealth() {
 }
 
 async function loadVocabularyStatus() {
-  const items = await getLocalStorage([LOCAL_STORAGE_KEYS.vocabularyEntries]);
-  renderVocabulary(getVocabularyEntriesFromItems(items));
+  const items = await getLocalStorage([
+    LOCAL_STORAGE_KEYS.vocabularyEntries,
+    LOCAL_STORAGE_KEYS.vocabularyQuizBuckets
+  ]);
+  const entries = getVocabularyEntriesFromItems(items);
+  const buckets = normalizeQuizBuckets(items?.[LOCAL_STORAGE_KEYS.vocabularyQuizBuckets], entries);
+  renderVocabulary(entries, buckets);
+}
+
+async function importVocabularyFromFile(file) {
+  if (!file) {
+    return;
+  }
+
+  const filename = String(file.name || '').toLowerCase();
+  const fileText = await file.text();
+  let importedEntries = [];
+
+  try {
+    const looksLikeJson = filename.endsWith('.json') || fileText.trim().startsWith('{') || fileText.trim().startsWith('[');
+    importedEntries = looksLikeJson ? parseVocabularyJson(fileText) : parseVocabularyCsv(fileText);
+  } catch (error) {
+    showRuntimeStatus(`Import failed: ${error instanceof Error ? error.message : 'invalid file format'}`, true);
+    return;
+  }
+
+  if (!Array.isArray(importedEntries) || importedEntries.length === 0) {
+    showRuntimeStatus('Import failed: no valid vocabulary entries found.', true);
+    return;
+  }
+
+  const items = await getLocalStorage([
+    LOCAL_STORAGE_KEYS.vocabularyEntries,
+    LOCAL_STORAGE_KEYS.vocabularyQuizBuckets
+  ]);
+
+  const existingEntries = getVocabularyEntriesFromItems(items);
+  const mergedEntries = mergeVocabularyEntryArrays(existingEntries, importedEntries);
+  const mergedBuckets = ingestEntriesIntoQuizBuckets(
+    items?.[LOCAL_STORAGE_KEYS.vocabularyQuizBuckets],
+    importedEntries,
+    existingEntries
+  );
+
+  const success = await setLocalStorage({
+    [LOCAL_STORAGE_KEYS.vocabularyEntries]: mergedEntries,
+    [LOCAL_STORAGE_KEYS.vocabularyQuizBuckets]: mergedBuckets
+  });
+
+  if (!success) {
+    showRuntimeStatus('Unable to store imported vocabulary.', true);
+    return;
+  }
+
+  renderVocabulary(mergedEntries, mergedBuckets);
+  showRuntimeStatus(`Imported ${importedEntries.length} entries from ${file.name}.`);
 }
 
 async function checkContentConnection() {
@@ -528,13 +979,24 @@ async function exportVocabulary() {
 }
 
 async function clearVocabulary() {
-  const success = await setLocalStorage({ [LOCAL_STORAGE_KEYS.vocabularyEntries]: [] });
+  const success = await setLocalStorage({
+    [LOCAL_STORAGE_KEYS.vocabularyEntries]: [],
+    [LOCAL_STORAGE_KEYS.vocabularyQuizBuckets]: {
+      notQuizzed: [],
+      correct: [],
+      incorrect: []
+    }
+  });
   if (!success) {
     showRuntimeStatus('Unable to clear saved vocabulary.', true);
     return;
   }
 
-  renderVocabulary([]);
+  renderVocabulary([], {
+    notQuizzed: [],
+    correct: [],
+    incorrect: []
+  });
   showRuntimeStatus('Cleared saved vocabulary.');
 }
 
@@ -676,6 +1138,19 @@ recheckHealthButton.addEventListener('click', () => {
 exportVocabularyButton.addEventListener('click', () => {
   void exportVocabulary();
 });
+importVocabularyButton?.addEventListener('click', () => {
+  importVocabularyInput?.click();
+});
+importVocabularyInput?.addEventListener('change', () => {
+  const selectedFile = importVocabularyInput.files?.[0];
+  if (!selectedFile) {
+    return;
+  }
+
+  void importVocabularyFromFile(selectedFile).finally(() => {
+    importVocabularyInput.value = '';
+  });
+});
 clearVocabularyButton.addEventListener('click', () => {
   void clearVocabulary();
 });
@@ -702,9 +1177,23 @@ chrome.storage.onChanged?.addListener((changes, areaName) => {
 
   if (Object.prototype.hasOwnProperty.call(changes, LOCAL_STORAGE_KEYS.vocabularyEntries)) {
     const entries = getVocabularyEntriesFromItems({
-      [LOCAL_STORAGE_KEYS.vocabularyEntries]: changes[LOCAL_STORAGE_KEYS.vocabularyEntries]?.newValue
+      [LOCAL_STORAGE_KEYS.vocabularyEntries]:
+        changes[LOCAL_STORAGE_KEYS.vocabularyEntries]?.newValue ?? currentVocabularyEntries
     });
-    renderVocabulary(entries);
+    const buckets = normalizeQuizBuckets(
+      changes[LOCAL_STORAGE_KEYS.vocabularyQuizBuckets]?.newValue ?? currentQuizBuckets,
+      entries
+    );
+    renderVocabulary(entries, buckets);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, LOCAL_STORAGE_KEYS.vocabularyQuizBuckets)) {
+    const entries = currentVocabularyEntries;
+    const buckets = normalizeQuizBuckets(
+      changes[LOCAL_STORAGE_KEYS.vocabularyQuizBuckets]?.newValue,
+      entries
+    );
+    renderVocabulary(entries, buckets);
   }
 });
 

@@ -345,6 +345,33 @@ h1 {
   font-size: 16px;
 }
 
+.bucket-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bucket-kpi {
+  padding: 10px 11px;
+  border: 1px solid rgba(62, 155, 95, 0.2);
+  border-radius: 12px;
+  background: var(--panel-mid);
+}
+
+.bucket-kpi span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.bucket-kpi strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--accent-strong);
+  font-size: 15px;
+}
+
 .hero-note {
   margin-top: 2px;
   border: 1px solid rgba(62, 155, 95, 0.25);
@@ -650,6 +677,10 @@ h1 {
 
   .stats {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .bucket-kpis {
+    grid-template-columns: 1fr;
   }
 
   .board {

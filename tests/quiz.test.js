@@ -1,4 +1,12 @@
-import { buildMatchingRound, filterRecentEntries, PAIRS_PER_ROUND, RECENT_WINDOW_MS } from '../extension/quiz.js';
+import {
+  buildMatchingRound,
+  buildQuizCandidateEntries,
+  createVocabularyKey,
+  filterRecentEntries,
+  normalizeQuizBuckets,
+  PAIRS_PER_ROUND,
+  RECENT_WINDOW_MS
+} from '../extension/quiz.js';
 import { describe, expect, it } from 'vitest';
 
 describe('quiz helpers', () => {
@@ -74,5 +82,50 @@ describe('quiz helpers', () => {
 
     const round = buildMatchingRound(entries, { random: () => 0.2 });
     expect(round).toBeNull();
+  });
+
+  it('keeps words in only one quiz bucket and removes notQuizzed entries that are already correct', () => {
+    const duplicate = {
+      source: 'hello',
+      translation: 'hola',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    };
+    const buckets = normalizeQuizBuckets(
+      {
+        notQuizzed: [duplicate],
+        correct: [duplicate],
+        incorrect: []
+      },
+      [duplicate]
+    );
+
+    expect(buckets.correct.length).toBe(1);
+    expect(buckets.notQuizzed.length).toBe(0);
+    expect(buckets.incorrect.length).toBe(0);
+  });
+
+  it('builds candidate entries only from notQuizzed and incorrect buckets', () => {
+    const correctEntry = {
+      source: 'water',
+      translation: 'agua',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    };
+    const buckets = normalizeQuizBuckets({
+      notQuizzed: [
+        { source: 'hello', translation: 'hola', sourceLanguage: 'en', targetLanguage: 'es' }
+      ],
+      correct: [correctEntry],
+      incorrect: [
+        { source: 'friend', translation: 'amigo', sourceLanguage: 'en', targetLanguage: 'es', wrongCount: 2 }
+      ]
+    });
+
+    const candidates = buildQuizCandidateEntries(buckets);
+    const keys = new Set(candidates.map((entry) => createVocabularyKey(entry)));
+
+    expect(candidates.length).toBe(2);
+    expect(keys.has(createVocabularyKey(correctEntry))).toBe(false);
   });
 });

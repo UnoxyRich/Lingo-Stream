@@ -1,14 +1,20 @@
 const VOCABULARY_ENTRIES_KEY = 'vocabularyEntries';
+const VOCABULARY_QUIZ_BUCKETS_KEY = 'vocabularyQuizBuckets';
 export const RECENT_WINDOW_MS = 60 * 60 * 1000;
 export const PAIRS_PER_ROUND = 5;
 export const MIN_PAIRS_PER_ROUND = PAIRS_PER_ROUND;
 export const MAX_PAIRS_PER_ROUND = PAIRS_PER_ROUND;
+const INCORRECT_SELECTION_WEIGHT = 0.24;
 const WRONG_FLASH_MS = 340;
 const SCORE_PER_CORRECT = 12;
 const SCORE_PENALTY_PER_WRONG = 3;
 
 const state = {
-  recentEntries: [],
+  quizBuckets: {
+    notQuizzed: [],
+    correct: [],
+    incorrect: []
+  },
   round: null,
   roundIndex: 0,
   selectedSourceId: null,
@@ -16,10 +22,12 @@ const state = {
   wrongSourceId: null,
   wrongTranslationId: null,
   matchedIds: new Set(),
+  roundOutcomeById: new Map(),
   correctMatches: 0,
   wrongMatches: 0,
   score: 0,
-  wrongFlashTimer: null
+  wrongFlashTimer: null,
+  roundPersisted: false
 };
 
 const elements = {
@@ -37,12 +45,57 @@ const elements = {
   pairValue: null,
   accuracyValue: null,
   scoreValue: null,
+  notQuizzedValue: null,
+  answeredCorrectValue: null,
+  answeredIncorrectValue: null,
   nextRoundButton: null,
   refreshButton: null
 };
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function parseTimestampCandidate(value) {
+  if (Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+
+    const parsed = Date.parse(value.trim());
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseCountCandidate(value) {
+  if (Number.isFinite(value)) {
+    return Math.max(1, Math.floor(value));
+  }
+
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (Number.isFinite(parsed)) {
+    return Math.max(1, parsed);
+  }
+
+  return 1;
+}
+
+export function createVocabularyKey(entry) {
+  return [
+    entry.source.toLowerCase(),
+    entry.translation.toLowerCase(),
+    entry.sourceLanguage.toLowerCase(),
+    entry.targetLanguage.toLowerCase()
+  ].join('|');
 }
 
 export function normalizeVocabularyEntry(entry) {
@@ -63,8 +116,6 @@ export function normalizeVocabularyEntry(entry) {
   const translation = entry.translation.trim();
   const sourceLanguage = entry.sourceLanguage.trim().toLowerCase();
   const targetLanguage = entry.targetLanguage.trim().toLowerCase();
-  const firstSeenAt = Number.isFinite(entry.firstSeenAt) ? entry.firstSeenAt : null;
-  const lastSeenAt = Number.isFinite(entry.lastSeenAt) ? entry.lastSeenAt : null;
 
   if (!source || !translation || !sourceLanguage || !targetLanguage) {
     return null;
@@ -75,8 +126,138 @@ export function normalizeVocabularyEntry(entry) {
     translation,
     sourceLanguage,
     targetLanguage,
-    firstSeenAt,
-    lastSeenAt
+    provider: typeof entry.provider === 'string' ? entry.provider.trim() : '',
+    count: parseCountCandidate(entry.count),
+    firstSeenAt: parseTimestampCandidate(entry.firstSeenAt),
+    lastSeenAt: parseTimestampCandidate(entry.lastSeenAt)
+  };
+}
+
+function normalizeQuizBucketEntry(entry) {
+  const normalized = normalizeVocabularyEntry(entry);
+  if (!normalized) {
+    return null;
+  }
+
+  const wrongCountRaw = Number.parseInt(String(entry?.wrongCount ?? 0), 10);
+  const wrongCount = Number.isFinite(wrongCountRaw) ? Math.max(0, wrongCountRaw) : 0;
+  const lastQuizAt = parseTimestampCandidate(entry?.lastQuizAt);
+
+  return {
+    ...normalized,
+    wrongCount,
+    lastQuizAt
+  };
+}
+
+function mergeVocabularyEntries(baseEntry, incomingEntry) {
+  const merged = {
+    ...baseEntry,
+    provider: incomingEntry.provider || baseEntry.provider,
+    count: parseCountCandidate(baseEntry.count) + parseCountCandidate(incomingEntry.count),
+    firstSeenAt: null,
+    lastSeenAt: null
+  };
+
+  const firstSeenCandidates = [baseEntry.firstSeenAt, incomingEntry.firstSeenAt].filter((value) => Number.isFinite(value));
+  merged.firstSeenAt = firstSeenCandidates.length > 0 ? Math.min(...firstSeenCandidates) : null;
+
+  const lastSeenCandidates = [baseEntry.lastSeenAt, incomingEntry.lastSeenAt].filter((value) => Number.isFinite(value));
+  merged.lastSeenAt = lastSeenCandidates.length > 0 ? Math.max(...lastSeenCandidates) : null;
+
+  return merged;
+}
+
+function mergeQuizBucketEntries(baseEntry, incomingEntry) {
+  const merged = mergeVocabularyEntries(baseEntry, incomingEntry);
+  merged.wrongCount = Math.max(baseEntry.wrongCount ?? 0, incomingEntry.wrongCount ?? 0);
+
+  const baseQuizAt = Number.isFinite(baseEntry.lastQuizAt) ? baseEntry.lastQuizAt : null;
+  const incomingQuizAt = Number.isFinite(incomingEntry.lastQuizAt) ? incomingEntry.lastQuizAt : null;
+  merged.lastQuizAt = Number.isFinite(baseQuizAt) && Number.isFinite(incomingQuizAt)
+    ? Math.max(baseQuizAt, incomingQuizAt)
+    : (baseQuizAt ?? incomingQuizAt);
+  return merged;
+}
+
+function sortEntriesByRecency(entries) {
+  return [...entries].sort((left, right) => {
+    const leftLast = Number.isFinite(left.lastSeenAt) ? left.lastSeenAt : 0;
+    const rightLast = Number.isFinite(right.lastSeenAt) ? right.lastSeenAt : 0;
+    return rightLast - leftLast;
+  });
+}
+
+function upsertBucketEntry(map, entry) {
+  const key = createVocabularyKey(entry);
+  const existing = map.get(key);
+  if (!existing) {
+    map.set(key, entry);
+    return;
+  }
+
+  map.set(key, mergeQuizBucketEntries(existing, entry));
+}
+
+export function normalizeQuizBuckets(rawBuckets, fallbackEntries = []) {
+  const notQuizzedMap = new Map();
+  const correctMap = new Map();
+  const incorrectMap = new Map();
+
+  const rawNotQuizzed = Array.isArray(rawBuckets?.notQuizzed) ? rawBuckets.notQuizzed : [];
+  const rawCorrect = Array.isArray(rawBuckets?.correct) ? rawBuckets.correct : [];
+  const rawIncorrect = Array.isArray(rawBuckets?.incorrect) ? rawBuckets.incorrect : [];
+
+  for (const entry of rawNotQuizzed) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(notQuizzedMap, normalized);
+  }
+
+  for (const entry of rawCorrect) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(correctMap, normalized);
+  }
+
+  for (const entry of rawIncorrect) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+    upsertBucketEntry(incorrectMap, normalized);
+  }
+
+  for (const entry of fallbackEntries) {
+    const normalized = normalizeQuizBucketEntry(entry);
+    if (!normalized) {
+      continue;
+    }
+
+    const key = createVocabularyKey(normalized);
+    if (correctMap.has(key) || incorrectMap.has(key)) {
+      continue;
+    }
+    upsertBucketEntry(notQuizzedMap, normalized);
+  }
+
+  for (const key of correctMap.keys()) {
+    notQuizzedMap.delete(key);
+    incorrectMap.delete(key);
+  }
+
+  for (const key of incorrectMap.keys()) {
+    notQuizzedMap.delete(key);
+  }
+
+  return {
+    notQuizzed: sortEntriesByRecency(Array.from(notQuizzedMap.values())),
+    correct: sortEntriesByRecency(Array.from(correctMap.values())),
+    incorrect: sortEntriesByRecency(Array.from(incorrectMap.values()))
   };
 }
 
@@ -99,7 +280,7 @@ export function filterRecentEntries(entries, now = Date.now(), windowMs = RECENT
       continue;
     }
 
-    const key = `${entry.source.toLowerCase()}|${entry.translation.toLowerCase()}|${entry.sourceLanguage}|${entry.targetLanguage}`;
+    const key = createVocabularyKey(entry);
     const existing = deduped.get(key);
     if (!existing || seenAt > (existing.lastSeenAt ?? existing.firstSeenAt ?? 0)) {
       deduped.set(key, {
@@ -110,7 +291,7 @@ export function filterRecentEntries(entries, now = Date.now(), windowMs = RECENT
     }
   }
 
-  return Array.from(deduped.values()).sort((left, right) => right.lastSeenAt - left.lastSeenAt);
+  return sortEntriesByRecency(Array.from(deduped.values()));
 }
 
 export function shuffle(values, random = Math.random) {
@@ -122,6 +303,58 @@ export function shuffle(values, random = Math.random) {
     copy[swapIndex] = temp;
   }
   return copy;
+}
+
+export function buildQuizCandidateEntries(buckets) {
+  const normalized = normalizeQuizBuckets(buckets);
+
+  const notQuizzed = normalized.notQuizzed.map((entry) => ({
+    ...entry,
+    quizBucket: 'not_quizzed',
+    selectionWeight: 1
+  }));
+
+  const incorrect = normalized.incorrect.map((entry) => {
+    const wrongCount = Number.isFinite(entry.wrongCount) ? entry.wrongCount : 0;
+    const decayedWeight = INCORRECT_SELECTION_WEIGHT / (1 + wrongCount * 0.35);
+    return {
+      ...entry,
+      quizBucket: 'incorrect',
+      selectionWeight: clamp(decayedWeight, 0.05, INCORRECT_SELECTION_WEIGHT)
+    };
+  });
+
+  return [...notQuizzed, ...incorrect];
+}
+
+function getCandidateWeight(entry) {
+  const explicitWeight = Number(entry?.selectionWeight);
+  if (Number.isFinite(explicitWeight) && explicitWeight > 0) {
+    return explicitWeight;
+  }
+
+  return entry?.quizBucket === 'incorrect' ? INCORRECT_SELECTION_WEIGHT : 1;
+}
+
+function pickWeightedCandidate(candidates, random = Math.random) {
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return null;
+  }
+
+  const totalWeight = candidates.reduce((sum, entry) => sum + getCandidateWeight(entry), 0);
+  if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
+    return candidates[Math.floor(random() * candidates.length)] ?? null;
+  }
+
+  let threshold = random() * totalWeight;
+  for (const entry of candidates) {
+    threshold -= getCandidateWeight(entry);
+    if (threshold <= 0) {
+      return entry;
+    }
+  }
+
+  return candidates[candidates.length - 1] ?? null;
 }
 
 export function buildMatchingRound(
@@ -136,30 +369,82 @@ export function buildMatchingRound(
     return null;
   }
 
-  const shuffled = shuffle(entries, random);
-  const selectedPairs = [];
-  const usedSource = new Set();
-  const usedTranslation = new Set();
-
-  for (const entry of shuffled) {
-    const sourceKey = entry.source.toLowerCase();
-    const translationKey = entry.translation.toLowerCase();
-    if (usedSource.has(sourceKey) || usedTranslation.has(translationKey)) {
+  const dedupedByKey = new Map();
+  for (const rawEntry of entries) {
+    const normalized = normalizeVocabularyEntry(rawEntry);
+    if (!normalized) {
       continue;
     }
 
-    const pairId = `${sourceKey}|${translationKey}|${selectedPairs.length}`;
-    selectedPairs.push({
-      id: pairId,
-      source: entry.source,
-      translation: entry.translation
-    });
-    usedSource.add(sourceKey);
-    usedTranslation.add(translationKey);
+    const key = createVocabularyKey(normalized);
+    const existing = dedupedByKey.get(key);
+    const candidate = {
+      ...normalized,
+      quizBucket: rawEntry?.quizBucket === 'incorrect' ? 'incorrect' : 'not_quizzed',
+      wrongCount: Number.isFinite(rawEntry?.wrongCount) ? Math.max(0, rawEntry.wrongCount) : 0,
+      selectionWeight: getCandidateWeight(rawEntry)
+    };
 
-    if (selectedPairs.length >= maxPairs) {
+    if (!existing) {
+      dedupedByKey.set(key, candidate);
+      continue;
+    }
+
+    const merged = mergeQuizBucketEntries(existing, candidate);
+    merged.quizBucket = existing.quizBucket === 'not_quizzed' ? 'not_quizzed' : candidate.quizBucket;
+    merged.selectionWeight = Math.max(getCandidateWeight(existing), getCandidateWeight(candidate));
+    dedupedByKey.set(key, merged);
+  }
+
+  const pool = Array.from(dedupedByKey.values());
+  if (pool.length < minPairs) {
+    return null;
+  }
+
+  const selectedPairs = [];
+  const usedSource = new Set();
+  const usedTranslation = new Set();
+  const selectedIds = new Set();
+
+  while (selectedPairs.length < maxPairs) {
+    const eligible = pool.filter((entry) => {
+      const pairId = createVocabularyKey(entry);
+      if (selectedIds.has(pairId)) {
+        return false;
+      }
+
+      const sourceKey = entry.source.toLowerCase();
+      const translationKey = entry.translation.toLowerCase();
+      return !usedSource.has(sourceKey) && !usedTranslation.has(translationKey);
+    });
+
+    if (eligible.length === 0) {
       break;
     }
+
+    const chosen = pickWeightedCandidate(eligible, random);
+    if (!chosen) {
+      break;
+    }
+
+    const pairId = createVocabularyKey(chosen);
+    selectedIds.add(pairId);
+    usedSource.add(chosen.source.toLowerCase());
+    usedTranslation.add(chosen.translation.toLowerCase());
+
+    selectedPairs.push({
+      id: pairId,
+      source: chosen.source,
+      translation: chosen.translation,
+      sourceLanguage: chosen.sourceLanguage,
+      targetLanguage: chosen.targetLanguage,
+      provider: chosen.provider,
+      count: chosen.count,
+      firstSeenAt: chosen.firstSeenAt,
+      lastSeenAt: chosen.lastSeenAt,
+      wrongCount: chosen.wrongCount,
+      quizBucket: chosen.quizBucket
+    });
   }
 
   if (selectedPairs.length < minPairs) {
@@ -192,6 +477,9 @@ function cacheElements() {
   elements.pairValue = document.getElementById('pairValue');
   elements.accuracyValue = document.getElementById('accuracyValue');
   elements.scoreValue = document.getElementById('scoreValue');
+  elements.notQuizzedValue = document.getElementById('notQuizzedValue');
+  elements.answeredCorrectValue = document.getElementById('answeredCorrectValue');
+  elements.answeredIncorrectValue = document.getElementById('answeredIncorrectValue');
   elements.nextRoundButton = document.getElementById('nextRoundButton');
   elements.refreshButton = document.getElementById('refreshButton');
 }
@@ -339,10 +627,24 @@ function getLocalStorage(keys) {
   });
 }
 
-async function getRecentVocabularyEntries() {
-  const items = await getLocalStorage([VOCABULARY_ENTRIES_KEY]);
-  const rawEntries = Array.isArray(items[VOCABULARY_ENTRIES_KEY]) ? items[VOCABULARY_ENTRIES_KEY] : [];
-  return filterRecentEntries(rawEntries);
+function setLocalStorage(items) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(items, () => {
+      resolve(!chrome.runtime.lastError);
+    });
+  });
+}
+
+async function getQuizBucketsFromStorage() {
+  const items = await getLocalStorage([VOCABULARY_ENTRIES_KEY, VOCABULARY_QUIZ_BUCKETS_KEY]);
+  const fallbackEntries = Array.isArray(items[VOCABULARY_ENTRIES_KEY]) ? items[VOCABULARY_ENTRIES_KEY] : [];
+  const buckets = normalizeQuizBuckets(items[VOCABULARY_QUIZ_BUCKETS_KEY], fallbackEntries);
+
+  if (!items[VOCABULARY_QUIZ_BUCKETS_KEY] && fallbackEntries.length > 0) {
+    await setLocalStorage({ [VOCABULARY_QUIZ_BUCKETS_KEY]: buckets });
+  }
+
+  return buckets;
 }
 
 function clearWrongFeedbackTimer() {
@@ -366,6 +668,18 @@ function setStatus(message, tone = 'neutral') {
   }
 }
 
+function updateBucketStats() {
+  if (elements.notQuizzedValue) {
+    elements.notQuizzedValue.textContent = String(state.quizBuckets.notQuizzed.length);
+  }
+  if (elements.answeredCorrectValue) {
+    elements.answeredCorrectValue.textContent = String(state.quizBuckets.correct.length);
+  }
+  if (elements.answeredIncorrectValue) {
+    elements.answeredIncorrectValue.textContent = String(state.quizBuckets.incorrect.length);
+  }
+}
+
 function updateStats() {
   const totalPairs = state.round?.pairs.length ?? 0;
   const matched = state.matchedIds.size;
@@ -379,6 +693,7 @@ function updateStats() {
   elements.scoreValue.textContent = String(state.score);
   elements.progressLabel.textContent = `Matched ${matched} of ${totalPairs} pairs`;
   elements.progressFill.style.width = `${progressPercent}%`;
+  updateBucketStats();
 }
 
 function updateInstructionLine() {
@@ -499,9 +814,97 @@ function clearSelections() {
   state.selectedTranslationId = null;
 }
 
+function markRoundOutcomeIncorrect(pairId) {
+  if (!pairId || !state.round?.pairById.has(pairId)) {
+    return;
+  }
+
+  state.roundOutcomeById.set(pairId, 'incorrect');
+}
+
+async function persistRoundBucketOutcomes() {
+  if (!state.round || state.roundPersisted) {
+    return;
+  }
+  state.roundPersisted = true;
+
+  const notQuizzedMap = new Map(
+    state.quizBuckets.notQuizzed.map((entry) => [createVocabularyKey(entry), entry])
+  );
+  const correctMap = new Map(
+    state.quizBuckets.correct.map((entry) => [createVocabularyKey(entry), entry])
+  );
+  const incorrectMap = new Map(
+    state.quizBuckets.incorrect.map((entry) => [createVocabularyKey(entry), entry])
+  );
+
+  const now = Date.now();
+
+  for (const pair of state.round.pairs) {
+    const key = createVocabularyKey(pair);
+    const roundResult = state.roundOutcomeById.get(pair.id) === 'incorrect' ? 'incorrect' : 'correct';
+    const normalizedPair = normalizeQuizBucketEntry({
+      ...pair,
+      wrongCount: 0,
+      lastQuizAt: now
+    });
+
+    if (!normalizedPair) {
+      continue;
+    }
+
+    notQuizzedMap.delete(key);
+
+    if (roundResult === 'correct') {
+      incorrectMap.delete(key);
+      const existingCorrect = correctMap.get(key);
+      const mergedCorrect = existingCorrect
+        ? mergeQuizBucketEntries(existingCorrect, normalizedPair)
+        : normalizedPair;
+      mergedCorrect.wrongCount = 0;
+      mergedCorrect.lastQuizAt = now;
+      correctMap.set(key, mergedCorrect);
+      continue;
+    }
+
+    if (correctMap.has(key)) {
+      notQuizzedMap.delete(key);
+      incorrectMap.delete(key);
+      continue;
+    }
+
+    const existingIncorrect = incorrectMap.get(key);
+    const mergedIncorrect = existingIncorrect
+      ? mergeQuizBucketEntries(existingIncorrect, normalizedPair)
+      : normalizedPair;
+    mergedIncorrect.wrongCount = (existingIncorrect?.wrongCount ?? 0) + 1;
+    mergedIncorrect.lastQuizAt = now;
+    incorrectMap.set(key, mergedIncorrect);
+  }
+
+  for (const key of correctMap.keys()) {
+    notQuizzedMap.delete(key);
+    incorrectMap.delete(key);
+  }
+
+  for (const key of incorrectMap.keys()) {
+    notQuizzedMap.delete(key);
+  }
+
+  state.quizBuckets = {
+    notQuizzed: sortEntriesByRecency(Array.from(notQuizzedMap.values())),
+    correct: sortEntriesByRecency(Array.from(correctMap.values())),
+    incorrect: sortEntriesByRecency(Array.from(incorrectMap.values()))
+  };
+  updateBucketStats();
+
+  await setLocalStorage({ [VOCABULARY_QUIZ_BUCKETS_KEY]: state.quizBuckets });
+}
+
 function onRoundCompleted() {
   elements.nextRoundButton.disabled = false;
   setStatus(`Great run. You matched all ${PAIRS_PER_ROUND} words.`, 'good');
+  void persistRoundBucketOutcomes();
 }
 
 function evaluateCurrentSelection() {
@@ -516,6 +919,11 @@ function evaluateCurrentSelection() {
     state.matchedIds.add(sourceId);
     state.correctMatches += 1;
     state.score += SCORE_PER_CORRECT;
+
+    if (state.roundOutcomeById.get(sourceId) !== 'incorrect') {
+      state.roundOutcomeById.set(sourceId, 'correct');
+    }
+
     const matchedCount = state.matchedIds.size;
     clearSelections();
     clearWrongFeedbackTimer();
@@ -535,6 +943,8 @@ function evaluateCurrentSelection() {
   state.score = Math.max(0, state.score - SCORE_PENALTY_PER_WRONG);
   state.wrongSourceId = sourceId;
   state.wrongTranslationId = translationId;
+  markRoundOutcomeIncorrect(sourceId);
+  markRoundOutcomeIncorrect(translationId);
   setStatus('Not a match. Keep the source word selected and try another translation.', 'warn');
   renderRound();
 
@@ -610,15 +1020,18 @@ function showQuizPanel() {
 }
 
 function buildAndStartRound() {
-  const round = buildMatchingRound(state.recentEntries);
+  const candidates = buildQuizCandidateEntries(state.quizBuckets);
+  const round = buildMatchingRound(candidates);
   if (!round) {
-    showEmptyState(`You need at least ${PAIRS_PER_ROUND} unique source/translation pairs from the last hour.`);
+    showEmptyState(`You need at least ${PAIRS_PER_ROUND} words from Not Quizzed or Answered Incorrectly.`);
     return false;
   }
 
   state.round = round;
   state.roundIndex += 1;
+  state.roundPersisted = false;
   state.matchedIds = new Set();
+  state.roundOutcomeById = new Map();
   state.wrongSourceId = null;
   state.wrongTranslationId = null;
   clearSelections();
@@ -633,11 +1046,13 @@ function buildAndStartRound() {
 function resetScoreState() {
   state.round = null;
   state.roundIndex = 0;
+  state.roundPersisted = false;
   state.selectedSourceId = null;
   state.selectedTranslationId = null;
   state.wrongSourceId = null;
   state.wrongTranslationId = null;
   state.matchedIds = new Set();
+  state.roundOutcomeById = new Map();
   state.correctMatches = 0;
   state.wrongMatches = 0;
   state.score = 0;
@@ -647,9 +1062,9 @@ function resetScoreState() {
 async function refreshWordsAndStart() {
   elements.refreshButton.disabled = true;
   elements.nextRoundButton.disabled = true;
-  setStatus('Loading recent vocabulary...', 'neutral');
+  setStatus('Loading stored quiz words...', 'neutral');
 
-  state.recentEntries = await getRecentVocabularyEntries();
+  state.quizBuckets = await getQuizBucketsFromStorage();
   const started = buildAndStartRound();
   if (!started) {
     updateStats();
@@ -659,8 +1074,9 @@ async function refreshWordsAndStart() {
 }
 
 function startNewRound() {
-  if (!Array.isArray(state.recentEntries) || state.recentEntries.length < MIN_PAIRS_PER_ROUND) {
-    showEmptyState(`You need at least ${PAIRS_PER_ROUND} recent words. Click "Refresh" after watching more captions.`);
+  const candidates = buildQuizCandidateEntries(state.quizBuckets);
+  if (!Array.isArray(candidates) || candidates.length < MIN_PAIRS_PER_ROUND) {
+    showEmptyState(`You need at least ${PAIRS_PER_ROUND} words in Not Quizzed or Answered Incorrectly.`);
     return;
   }
 
@@ -684,6 +1100,7 @@ export async function initQuizPage() {
   attachBackgroundParallax();
   attachEventHandlers();
   resetScoreState();
+  updateBucketStats();
   await refreshWordsAndStart();
 }
 
