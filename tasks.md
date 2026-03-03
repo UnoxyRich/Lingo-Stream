@@ -17,6 +17,9 @@
 - [x] Vocabulary import workflow added (CSV/JSON)
 - [x] Quiz progression buckets added: not quizzed, answered correctly, answered incorrectly
 - [x] Randomized quiz selection updated to use not quizzed + low-probability incorrect words
+- [x] Nightly CI workflow added for fixture-based extension E2E smoke tests
+- [x] Vocabulary filters added in popup (text + language + provider + date range)
+- [x] UX polish added for vocabulary badges and export confirmation states
 
 ## Completed In v1.0.0 Release
 - [x] Added safer sender trust fallback for content-script messages with missing URL metadata
@@ -33,13 +36,10 @@
 - [x] Published release package `Lingo.Stream.1.0.0.Release.zip`
 
 ## Remaining TODO (Near Term)
-- [ ] Add vocabulary filters/search in popup (language/provider/date)
 - [ ] Add backoff/rate-limit handling for provider throttling
 - [ ] Add last-translation failure diagnostics in popup health panel (error + provider fallback trace)
 
 ## Future TODO (Planned)
-- [ ] Add nightly CI job with extension E2E smoke test against a stable YouTube caption fixture
-- [ ] Add UX polish for saved vocabulary count badges and export confirmation states
 
 ## Definition of Done (MVP)
 - [x] Extension installs successfully

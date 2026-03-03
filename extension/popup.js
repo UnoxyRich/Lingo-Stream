@@ -39,7 +39,15 @@ const translationHealthStatus = document.getElementById('translationHealthStatus
 const recheckHealthButton = document.getElementById('recheckHealthButton');
 const vocabularyStatus = document.getElementById('vocabularyStatus');
 const quizBucketStatus = document.getElementById('quizBucketStatus');
+const vocabularyTotalBadge = document.getElementById('vocabularyTotalBadge');
+const vocabularyFilteredBadge = document.getElementById('vocabularyFilteredBadge');
+const vocabularyProviderBadge = document.getElementById('vocabularyProviderBadge');
 const vocabularyFilterInput = document.getElementById('vocabularyFilterInput');
+const vocabularyLanguageFilter = document.getElementById('vocabularyLanguageFilter');
+const vocabularyProviderFilter = document.getElementById('vocabularyProviderFilter');
+const vocabularyDateFrom = document.getElementById('vocabularyDateFrom');
+const vocabularyDateTo = document.getElementById('vocabularyDateTo');
+const vocabularyClearFiltersButton = document.getElementById('vocabularyClearFiltersButton');
 const vocabularyEmptyState = document.getElementById('vocabularyEmptyState');
 const vocabularyList = document.getElementById('vocabularyList');
 const vocabularyTableBody = document.getElementById('vocabularyTableBody');
@@ -47,6 +55,7 @@ const importVocabularyButton = document.getElementById('importVocabularyButton')
 const importVocabularyInput = document.getElementById('importVocabularyInput');
 const exportVocabularyButton = document.getElementById('exportVocabularyButton');
 const clearVocabularyButton = document.getElementById('clearVocabularyButton');
+const vocabularyActionStatus = document.getElementById('vocabularyActionStatus');
 const debugEnabledInput = document.getElementById('debugEnabled');
 const clearLogsButton = document.getElementById('clearLogsButton');
 const logPanel = document.getElementById('logPanel');
@@ -109,6 +118,14 @@ function showStatus(message, isError = false) {
 
 function showRuntimeStatus(message, isError = false) {
   setStatusElement(runtimeStatus, message, isError ? 'error' : (message ? 'ok' : 'neutral'));
+}
+
+function showVocabularyActionStatus(message, tone = 'neutral') {
+  if (!vocabularyActionStatus) {
+    return;
+  }
+
+  setStatusElement(vocabularyActionStatus, message, tone);
 }
 
 function openQuizTab() {
@@ -454,6 +471,31 @@ function renderVocabularyStatus(entries, buckets = currentQuizBuckets) {
   clearVocabularyButton.disabled = count === 0;
 }
 
+function renderVocabularyBadges(entries, filteredEntries) {
+  const totalCount = Array.isArray(entries) ? entries.length : 0;
+  const filteredCount = Array.isArray(filteredEntries) ? filteredEntries.length : 0;
+
+  const providerSet = new Set();
+  if (Array.isArray(entries)) {
+    for (const entry of entries) {
+      const provider = typeof entry.provider === 'string' && entry.provider.trim()
+        ? entry.provider.trim().toLowerCase()
+        : 'unknown';
+      providerSet.add(provider);
+    }
+  }
+
+  if (vocabularyTotalBadge) {
+    vocabularyTotalBadge.textContent = String(totalCount);
+  }
+  if (vocabularyFilteredBadge) {
+    vocabularyFilteredBadge.textContent = String(filteredCount);
+  }
+  if (vocabularyProviderBadge) {
+    vocabularyProviderBadge.textContent = String(providerSet.size);
+  }
+}
+
 function createVocabularyRow(entry) {
   const row = document.createElement('tr');
   const sourceCell = document.createElement('td');
@@ -468,23 +510,158 @@ function createVocabularyRow(entry) {
   return row;
 }
 
+function parseDateBoundary(value, asEndOfDay = false) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null;
+  }
+
+  const [yearValue, monthValue, dayValue] = value.split('-').map((part) => Number.parseInt(part, 10));
+  if (!Number.isFinite(yearValue) || !Number.isFinite(monthValue) || !Number.isFinite(dayValue)) {
+    return null;
+  }
+
+  const date = asEndOfDay
+    ? new Date(yearValue, monthValue - 1, dayValue, 23, 59, 59, 999)
+    : new Date(yearValue, monthValue - 1, dayValue, 0, 0, 0, 0);
+  const timestamp = date.getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function getVocabularyEntryTimestamp(entry) {
+  if (Number.isFinite(entry?.lastSeenAt)) {
+    return entry.lastSeenAt;
+  }
+
+  if (Number.isFinite(entry?.firstSeenAt)) {
+    return entry.firstSeenAt;
+  }
+
+  return null;
+}
+
 function getVocabularyFilterQuery() {
   return typeof vocabularyFilterInput?.value === 'string'
     ? vocabularyFilterInput.value.trim().toLowerCase()
     : '';
 }
 
+function getVocabularyLanguageFilterValue() {
+  return typeof vocabularyLanguageFilter?.value === 'string'
+    ? vocabularyLanguageFilter.value.trim().toLowerCase()
+    : '';
+}
+
+function getVocabularyProviderFilterValue() {
+  return typeof vocabularyProviderFilter?.value === 'string'
+    ? vocabularyProviderFilter.value.trim().toLowerCase()
+    : '';
+}
+
+function hasActiveVocabularyFilters() {
+  return (
+    getVocabularyFilterQuery().length > 0 ||
+    getVocabularyLanguageFilterValue().length > 0 ||
+    getVocabularyProviderFilterValue().length > 0 ||
+    (typeof vocabularyDateFrom?.value === 'string' && vocabularyDateFrom.value.trim().length > 0) ||
+    (typeof vocabularyDateTo?.value === 'string' && vocabularyDateTo.value.trim().length > 0)
+  );
+}
+
+function renderDynamicSelectOptions(selectNode, options, placeholderLabel) {
+  if (!(selectNode instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  const previousValue = selectNode.value;
+  selectNode.textContent = '';
+
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = placeholderLabel;
+  selectNode.appendChild(placeholderOption);
+
+  const sortedOptions = [...options].sort((left, right) => left.label.localeCompare(right.label));
+  for (const option of sortedOptions) {
+    const optionNode = document.createElement('option');
+    optionNode.value = option.value;
+    optionNode.textContent = option.label;
+    selectNode.appendChild(optionNode);
+  }
+
+  const hasPreviousValue = sortedOptions.some((option) => option.value === previousValue);
+  selectNode.value = hasPreviousValue ? previousValue : '';
+}
+
+function updateVocabularyFilterControls(entries) {
+  const providerCounts = new Map();
+  const languageCounts = new Map();
+
+  for (const entry of entries) {
+    const languageKey = `${entry.sourceLanguage.toLowerCase()}->${entry.targetLanguage.toLowerCase()}`;
+    languageCounts.set(languageKey, (languageCounts.get(languageKey) ?? 0) + 1);
+
+    const providerKey = typeof entry.provider === 'string' && entry.provider.trim()
+      ? entry.provider.trim().toLowerCase()
+      : 'unknown';
+    providerCounts.set(providerKey, (providerCounts.get(providerKey) ?? 0) + 1);
+  }
+
+  renderDynamicSelectOptions(
+    vocabularyLanguageFilter,
+    Array.from(languageCounts.entries()).map(([value, count]) => ({
+      value,
+      label: `${value} (${count})`
+    })),
+    'All language pairs'
+  );
+
+  renderDynamicSelectOptions(
+    vocabularyProviderFilter,
+    Array.from(providerCounts.entries()).map(([value, count]) => ({
+      value,
+      label: `${value} (${count})`
+    })),
+    'All providers'
+  );
+}
+
 function getFilteredVocabularyEntries(entries) {
   const query = getVocabularyFilterQuery();
-  if (!query) {
-    return entries;
-  }
+  const languageFilter = getVocabularyLanguageFilterValue();
+  const providerFilter = getVocabularyProviderFilterValue();
+  const dateFromTimestamp = parseDateBoundary(vocabularyDateFrom?.value ?? '', false);
+  const dateToTimestamp = parseDateBoundary(vocabularyDateTo?.value ?? '', true);
 
   return entries.filter((entry) => {
     const source = entry.source.toLowerCase();
     const translation = entry.translation.toLowerCase();
     const languagePair = `${entry.sourceLanguage}->${entry.targetLanguage}`.toLowerCase();
-    return source.includes(query) || translation.includes(query) || languagePair.includes(query);
+
+    if (query && !(source.includes(query) || translation.includes(query) || languagePair.includes(query))) {
+      return false;
+    }
+
+    if (languageFilter && languagePair !== languageFilter) {
+      return false;
+    }
+
+    const provider = typeof entry.provider === 'string' && entry.provider.trim()
+      ? entry.provider.trim().toLowerCase()
+      : 'unknown';
+    if (providerFilter && provider !== providerFilter) {
+      return false;
+    }
+
+    const timestamp = getVocabularyEntryTimestamp(entry);
+    if (Number.isFinite(dateFromTimestamp) && (!Number.isFinite(timestamp) || timestamp < dateFromTimestamp)) {
+      return false;
+    }
+
+    if (Number.isFinite(dateToTimestamp) && (!Number.isFinite(timestamp) || timestamp > dateToTimestamp)) {
+      return false;
+    }
+
+    return true;
   });
 }
 
@@ -493,15 +670,17 @@ function renderVocabularyList(entries) {
     return;
   }
 
+  updateVocabularyFilterControls(entries);
   const filtered = getFilteredVocabularyEntries(entries);
   const hasEntries = filtered.length > 0;
-  const hasFilter = getVocabularyFilterQuery().length > 0;
+  const hasFilter = hasActiveVocabularyFilters();
 
   vocabularyTableBody.textContent = '';
   for (const entry of filtered) {
     vocabularyTableBody.appendChild(createVocabularyRow(entry));
   }
 
+  renderVocabularyBadges(entries, filtered);
   vocabularyList.classList.toggle('hidden', !hasEntries);
   vocabularyEmptyState.classList.toggle('hidden', hasEntries);
   vocabularyEmptyState.textContent = hasFilter
@@ -771,6 +950,26 @@ function parseVocabularyJson(jsonText) {
   return entries;
 }
 
+function clearVocabularyFilters() {
+  if (vocabularyFilterInput) {
+    vocabularyFilterInput.value = '';
+  }
+  if (vocabularyLanguageFilter) {
+    vocabularyLanguageFilter.value = '';
+  }
+  if (vocabularyProviderFilter) {
+    vocabularyProviderFilter.value = '';
+  }
+  if (vocabularyDateFrom) {
+    vocabularyDateFrom.value = '';
+  }
+  if (vocabularyDateTo) {
+    vocabularyDateTo.value = '';
+  }
+
+  renderVocabularyList(currentVocabularyEntries);
+}
+
 function triggerAnchorDownload(url, filename) {
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -853,6 +1052,13 @@ async function importVocabularyFromFile(file) {
     return;
   }
 
+  const originalImportLabel = importVocabularyButton?.textContent ?? 'Import CSV/JSON';
+  if (importVocabularyButton) {
+    importVocabularyButton.disabled = true;
+    importVocabularyButton.textContent = 'Importing...';
+  }
+  showVocabularyActionStatus('Reading import file...');
+
   const filename = String(file.name || '').toLowerCase();
   const fileText = await file.text();
   let importedEntries = [];
@@ -861,12 +1067,20 @@ async function importVocabularyFromFile(file) {
     const looksLikeJson = filename.endsWith('.json') || fileText.trim().startsWith('{') || fileText.trim().startsWith('[');
     importedEntries = looksLikeJson ? parseVocabularyJson(fileText) : parseVocabularyCsv(fileText);
   } catch (error) {
-    showRuntimeStatus(`Import failed: ${error instanceof Error ? error.message : 'invalid file format'}`, true);
+    showVocabularyActionStatus(`Import failed: ${error instanceof Error ? error.message : 'invalid file format'}`, 'error');
+    if (importVocabularyButton) {
+      importVocabularyButton.disabled = false;
+      importVocabularyButton.textContent = originalImportLabel;
+    }
     return;
   }
 
   if (!Array.isArray(importedEntries) || importedEntries.length === 0) {
-    showRuntimeStatus('Import failed: no valid vocabulary entries found.', true);
+    showVocabularyActionStatus('Import failed: no valid vocabulary entries found.', 'error');
+    if (importVocabularyButton) {
+      importVocabularyButton.disabled = false;
+      importVocabularyButton.textContent = originalImportLabel;
+    }
     return;
   }
 
@@ -889,12 +1103,20 @@ async function importVocabularyFromFile(file) {
   });
 
   if (!success) {
-    showRuntimeStatus('Unable to store imported vocabulary.', true);
+    showVocabularyActionStatus('Unable to store imported vocabulary.', 'error');
+    if (importVocabularyButton) {
+      importVocabularyButton.disabled = false;
+      importVocabularyButton.textContent = originalImportLabel;
+    }
     return;
   }
 
   renderVocabulary(mergedEntries, mergedBuckets);
-  showRuntimeStatus(`Imported ${importedEntries.length} entries from ${file.name}.`);
+  showVocabularyActionStatus(`Imported ${importedEntries.length} entries from ${file.name}.`, 'ok');
+  if (importVocabularyButton) {
+    importVocabularyButton.disabled = false;
+    importVocabularyButton.textContent = originalImportLabel;
+  }
 }
 
 async function checkContentConnection() {
@@ -954,11 +1176,18 @@ async function refreshActiveCaptions() {
 }
 
 async function exportVocabulary() {
+  const originalExportLabel = exportVocabularyButton.textContent;
+  exportVocabularyButton.disabled = true;
+  exportVocabularyButton.textContent = 'Exporting...';
+  showVocabularyActionStatus('Preparing vocabulary export...');
+
   const items = await getLocalStorage([LOCAL_STORAGE_KEYS.vocabularyEntries]);
   const entries = getVocabularyEntriesFromItems(items);
 
   if (entries.length === 0) {
-    showRuntimeStatus('No saved vocabulary to export.', true);
+    showVocabularyActionStatus('No saved vocabulary to export.', 'error');
+    exportVocabularyButton.textContent = originalExportLabel;
+    exportVocabularyButton.disabled = true;
     return;
   }
 
@@ -971,14 +1200,22 @@ async function exportVocabulary() {
   });
 
   if (!downloaded) {
-    showRuntimeStatus('Export failed. Please try again.', true);
+    showVocabularyActionStatus('Export failed. Please try again.', 'error');
+    exportVocabularyButton.textContent = originalExportLabel;
+    exportVocabularyButton.disabled = false;
     return;
   }
 
-  showRuntimeStatus(`Exported ${entries.length} vocabulary entries.`);
+  showVocabularyActionStatus(`Export complete: ${entries.length} entries exported.`, 'ok');
+  exportVocabularyButton.textContent = originalExportLabel;
+  exportVocabularyButton.disabled = false;
 }
 
 async function clearVocabulary() {
+  const originalClearLabel = clearVocabularyButton.textContent;
+  clearVocabularyButton.disabled = true;
+  clearVocabularyButton.textContent = 'Clearing...';
+
   const success = await setLocalStorage({
     [LOCAL_STORAGE_KEYS.vocabularyEntries]: [],
     [LOCAL_STORAGE_KEYS.vocabularyQuizBuckets]: {
@@ -988,7 +1225,9 @@ async function clearVocabulary() {
     }
   });
   if (!success) {
-    showRuntimeStatus('Unable to clear saved vocabulary.', true);
+    showVocabularyActionStatus('Unable to clear saved vocabulary.', 'error');
+    clearVocabularyButton.textContent = originalClearLabel;
+    clearVocabularyButton.disabled = false;
     return;
   }
 
@@ -997,7 +1236,9 @@ async function clearVocabulary() {
     correct: [],
     incorrect: []
   });
-  showRuntimeStatus('Cleared saved vocabulary.');
+  showVocabularyActionStatus('Cleared all saved vocabulary.', 'ok');
+  clearVocabularyButton.textContent = originalClearLabel;
+  clearVocabularyButton.disabled = true;
 }
 
 function loadSettings() {
@@ -1157,6 +1398,19 @@ clearVocabularyButton.addEventListener('click', () => {
 vocabularyFilterInput?.addEventListener('input', () => {
   renderVocabularyList(currentVocabularyEntries);
 });
+vocabularyLanguageFilter?.addEventListener('change', () => {
+  renderVocabularyList(currentVocabularyEntries);
+});
+vocabularyProviderFilter?.addEventListener('change', () => {
+  renderVocabularyList(currentVocabularyEntries);
+});
+vocabularyDateFrom?.addEventListener('change', () => {
+  renderVocabularyList(currentVocabularyEntries);
+});
+vocabularyDateTo?.addEventListener('change', () => {
+  renderVocabularyList(currentVocabularyEntries);
+});
+vocabularyClearFiltersButton?.addEventListener('click', clearVocabularyFilters);
 debugEnabledInput.addEventListener('change', (event) => {
   setDebugMode(event.target.checked);
 });

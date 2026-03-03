@@ -1,0 +1,43 @@
+{
+  "fixtureId": "youtube-caption-fixture-v1",
+  "description": "Stable caption cue fixture for nightly extension E2E smoke tests.",
+  "videoUrl": "https://www.youtube.com/watch?v=fixture-v1",
+  "settings": {
+    "enabled": true,
+    "replacementPercentage": 100,
+    "translationProvider": "mymemory",
+    "sourceLanguage": "en",
+    "targetLanguage": "es",
+    "translationTimeoutMs": 1200
+  },
+  "translations": {
+    "enjoy": "gusto",
+    "coding": "codificar",
+    "daily": "diario",
+    "practice": "practicar",
+    "speaking": "hablar"
+  },
+  "cues": [
+    {
+      "text": "I enjoy coding",
+      "expectedContains": [
+        "enjoy (gusto)",
+        "coding (codificar)"
+      ]
+    },
+    {
+      "text": "I enjoy coding daily",
+      "expectedContains": [
+        "daily (diario)"
+      ]
+    },
+    {
+      "text": "I practice speaking daily",
+      "expectedContains": [
+        "practice (practicar)",
+        "speaking (hablar)",
+        "daily (diario)"
+      ]
+    }
+  ]
+}

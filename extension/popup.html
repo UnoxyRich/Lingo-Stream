@@ -329,6 +329,37 @@
         margin: 6px 0;
       }
 
+      .vocabulary-badges {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        margin: 6px 0;
+      }
+
+      .vocabulary-badge {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f6fdf7;
+        padding: 5px 6px;
+      }
+
+      .vocabulary-badge .label {
+        display: block;
+        font-size: 9px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-weight: 700;
+      }
+
+      .vocabulary-badge .value {
+        display: block;
+        margin-top: 2px;
+        color: var(--accent-strong);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
       #vocabularyFilterInput {
         width: 100%;
         border: 1px solid var(--line);
@@ -337,6 +368,31 @@
         background: #f6fdf7;
         color: var(--text);
         font-size: 11px;
+      }
+
+      .vocabulary-filter-grid {
+        margin-top: 6px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+
+      .vocabulary-filter-grid select,
+      .vocabulary-filter-grid input[type="date"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: #f6fdf7;
+        color: var(--text);
+        font-size: 11px;
+      }
+
+      #vocabularyClearFiltersButton {
+        width: 100%;
+        color: var(--accent-strong);
+        border: 1px solid rgba(62, 155, 95, 0.3);
+        background: rgba(62, 155, 95, 0.08);
       }
 
       .vocabulary-list {
@@ -390,6 +446,11 @@
 
       .status.ok {
         color: var(--ok);
+      }
+
+      .vocabulary-action-status {
+        margin-top: 6px;
+        min-height: 14px;
       }
 
       details {
@@ -556,13 +617,40 @@
           <p id="quizBucketStatus" class="status health-line" role="status" aria-live="polite">
             Not quizzed: 0 | Correct: 0 | Incorrect: 0
           </p>
+          <div class="vocabulary-badges" aria-live="polite">
+            <article class="vocabulary-badge">
+              <span class="label">Total</span>
+              <strong id="vocabularyTotalBadge" class="value">0</strong>
+            </article>
+            <article class="vocabulary-badge">
+              <span class="label">Filtered</span>
+              <strong id="vocabularyFilteredBadge" class="value">0</strong>
+            </article>
+            <article class="vocabulary-badge">
+              <span class="label">Providers</span>
+              <strong id="vocabularyProviderBadge" class="value">0</strong>
+            </article>
+          </div>
           <div class="vocabulary-toolbar">
             <input
               id="vocabularyFilterInput"
               type="search"
-              placeholder="Filter source or translation"
+              placeholder="Search source/translation"
               aria-label="Filter saved vocabulary"
             />
+            <div class="vocabulary-filter-grid">
+              <select id="vocabularyLanguageFilter" aria-label="Filter by language pair">
+                <option value="">All language pairs</option>
+              </select>
+              <select id="vocabularyProviderFilter" aria-label="Filter by provider">
+                <option value="">All providers</option>
+              </select>
+              <input id="vocabularyDateFrom" type="date" aria-label="Filter from date" />
+              <input id="vocabularyDateTo" type="date" aria-label="Filter to date" />
+            </div>
+            <div class="button-row">
+              <button id="vocabularyClearFiltersButton" type="button">Clear Filters</button>
+            </div>
           </div>
           <p id="vocabularyEmptyState" class="vocabulary-empty">No saved words yet.</p>
           <div id="vocabularyList" class="vocabulary-list hidden">
@@ -591,6 +679,12 @@
           <div class="button-row">
             <button id="clearVocabularyButton" type="button">Clear Saved</button>
           </div>
+          <p
+            id="vocabularyActionStatus"
+            class="status health-line vocabulary-action-status"
+            role="status"
+            aria-live="polite"
+          ></p>
         </details>
 
         <details class="span-2">

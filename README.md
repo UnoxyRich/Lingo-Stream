@@ -91,6 +91,7 @@ Lingo Stream output (Spanish):
 
 - `npm run lint` - run ESLint
 - `npm test` - run Vitest suite
+- `npm run test:e2e:smoke` - run fixture-based YouTube caption E2E smoke test
 - `npm run test:coverage` - run tests with coverage
 - `npm run validate:manifest` - validate manifest structure
 - `npm run build` - sync assets + build checks
@@ -135,8 +136,6 @@ Run all tests:
 
 ## Roadmap
 
-- Vocabulary import workflow (CSV/JSON)
 - Vocabulary filtering/search in popup
 - Better provider throttling/backoff handling
 - Richer health diagnostics for translation failures
-- CI smoke checks for YouTube caption fixtures
