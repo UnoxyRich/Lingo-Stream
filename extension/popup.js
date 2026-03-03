@@ -3,7 +3,7 @@ const DEFAULT_SETTINGS = {
   targetLanguage: 'es',
   replacementPercentage: 5,
   enabled: true,
-  saveVocabulary: false
+  saveVocabulary: true
 };
 const DEBUG_STORAGE_KEYS = {
   enabled: 'debug',
@@ -36,6 +36,10 @@ const contentHealthStatus = document.getElementById('contentHealthStatus');
 const translationHealthStatus = document.getElementById('translationHealthStatus');
 const recheckHealthButton = document.getElementById('recheckHealthButton');
 const vocabularyStatus = document.getElementById('vocabularyStatus');
+const vocabularyFilterInput = document.getElementById('vocabularyFilterInput');
+const vocabularyEmptyState = document.getElementById('vocabularyEmptyState');
+const vocabularyList = document.getElementById('vocabularyList');
+const vocabularyTableBody = document.getElementById('vocabularyTableBody');
 const exportVocabularyButton = document.getElementById('exportVocabularyButton');
 const clearVocabularyButton = document.getElementById('clearVocabularyButton');
 const debugEnabledInput = document.getElementById('debugEnabled');
@@ -43,6 +47,7 @@ const clearLogsButton = document.getElementById('clearLogsButton');
 const logPanel = document.getElementById('logPanel');
 
 let logPollTimer = null;
+let currentVocabularyEntries = [];
 
 function updateReplacementLabel(value) {
   replacementPercentageValue.textContent = `${value}%`;
@@ -249,6 +254,67 @@ function renderVocabularyStatus(entries) {
   clearVocabularyButton.disabled = count === 0;
 }
 
+function createVocabularyRow(entry) {
+  const row = document.createElement('tr');
+  const sourceCell = document.createElement('td');
+  const translationCell = document.createElement('td');
+  const countCell = document.createElement('td');
+
+  sourceCell.textContent = entry.source;
+  translationCell.textContent = entry.translation;
+  countCell.textContent = String(entry.count);
+
+  row.append(sourceCell, translationCell, countCell);
+  return row;
+}
+
+function getVocabularyFilterQuery() {
+  return typeof vocabularyFilterInput?.value === 'string'
+    ? vocabularyFilterInput.value.trim().toLowerCase()
+    : '';
+}
+
+function getFilteredVocabularyEntries(entries) {
+  const query = getVocabularyFilterQuery();
+  if (!query) {
+    return entries;
+  }
+
+  return entries.filter((entry) => {
+    const source = entry.source.toLowerCase();
+    const translation = entry.translation.toLowerCase();
+    const languagePair = `${entry.sourceLanguage}->${entry.targetLanguage}`.toLowerCase();
+    return source.includes(query) || translation.includes(query) || languagePair.includes(query);
+  });
+}
+
+function renderVocabularyList(entries) {
+  if (!vocabularyTableBody || !vocabularyList || !vocabularyEmptyState) {
+    return;
+  }
+
+  const filtered = getFilteredVocabularyEntries(entries);
+  const hasEntries = filtered.length > 0;
+  const hasFilter = getVocabularyFilterQuery().length > 0;
+
+  vocabularyTableBody.textContent = '';
+  for (const entry of filtered) {
+    vocabularyTableBody.appendChild(createVocabularyRow(entry));
+  }
+
+  vocabularyList.classList.toggle('hidden', !hasEntries);
+  vocabularyEmptyState.classList.toggle('hidden', hasEntries);
+  vocabularyEmptyState.textContent = hasFilter
+    ? 'No saved words match this filter.'
+    : 'No saved words yet.';
+}
+
+function renderVocabulary(entries) {
+  currentVocabularyEntries = Array.isArray(entries) ? entries : [];
+  renderVocabularyStatus(currentVocabularyEntries);
+  renderVocabularyList(currentVocabularyEntries);
+}
+
 function csvEscapeCell(value) {
   const normalized = String(value ?? '');
   if (/["\n,]/.test(normalized)) {
@@ -298,17 +364,62 @@ function buildVocabularyCsv(entries) {
   return rows.join('\n');
 }
 
-function downloadTextFile({ filename, content, mimeType }) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
+function triggerAnchorDownload(url, filename) {
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;
+  anchor.rel = 'noopener';
   anchor.click();
+}
 
+function scheduleBlobCleanup(url) {
   setTimeout(() => {
     URL.revokeObjectURL(url);
-  }, 0);
+  }, 5000);
+}
+
+function downloadTextFile({ filename, content, mimeType }) {
+  return new Promise((resolve) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+
+    if (typeof chrome.downloads?.download === 'function') {
+      chrome.downloads.download(
+        {
+          url,
+          filename,
+          saveAs: true,
+          conflictAction: 'uniquify'
+        },
+        (downloadId) => {
+          const hasError = Boolean(chrome.runtime.lastError) || !Number.isFinite(downloadId);
+          if (hasError) {
+            try {
+              triggerAnchorDownload(url, filename);
+              resolve(true);
+            } catch {
+              resolve(false);
+            }
+            scheduleBlobCleanup(url);
+            return;
+          }
+
+          resolve(true);
+          scheduleBlobCleanup(url);
+        }
+      );
+      return;
+    }
+
+    try {
+      triggerAnchorDownload(url, filename);
+      resolve(true);
+    } catch {
+      resolve(false);
+    }
+
+    scheduleBlobCleanup(url);
+  });
 }
 
 async function loadTranslationHealth() {
@@ -322,7 +433,7 @@ async function loadTranslationHealth() {
 
 async function loadVocabularyStatus() {
   const items = await getLocalStorage([LOCAL_STORAGE_KEYS.vocabularyEntries]);
-  renderVocabularyStatus(getVocabularyEntriesFromItems(items));
+  renderVocabulary(getVocabularyEntriesFromItems(items));
 }
 
 async function checkContentConnection() {
@@ -392,11 +503,16 @@ async function exportVocabulary() {
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const csvContent = buildVocabularyCsv(entries);
-  downloadTextFile({
+  const downloaded = await downloadTextFile({
     filename: `lingo-stream-vocabulary-${timestamp}.csv`,
     content: csvContent,
     mimeType: 'text/csv;charset=utf-8'
   });
+
+  if (!downloaded) {
+    showRuntimeStatus('Export failed. Please try again.', true);
+    return;
+  }
 
   showRuntimeStatus(`Exported ${entries.length} vocabulary entries.`);
 }
@@ -408,7 +524,7 @@ async function clearVocabulary() {
     return;
   }
 
-  renderVocabularyStatus([]);
+  renderVocabulary([]);
   showRuntimeStatus('Cleared saved vocabulary.');
 }
 
@@ -420,12 +536,20 @@ function loadSettings() {
       return;
     }
 
+    const hasSaveVocabularySetting = typeof items.saveVocabulary === 'boolean';
+
     const loaded = {
       ...DEFAULT_SETTINGS,
-      ...items
+      ...items,
+      saveVocabulary: hasSaveVocabularySetting ? items.saveVocabulary : DEFAULT_SETTINGS.saveVocabulary
     };
 
     applySettingsToForm(loaded);
+
+    if (!hasSaveVocabularySetting) {
+      chrome.storage.sync.set({ saveVocabulary: DEFAULT_SETTINGS.saveVocabulary }, () => {});
+    }
+
     console.log('Popup settings loaded.', loaded);
   });
 }
@@ -544,6 +668,9 @@ exportVocabularyButton.addEventListener('click', () => {
 clearVocabularyButton.addEventListener('click', () => {
   void clearVocabulary();
 });
+vocabularyFilterInput?.addEventListener('input', () => {
+  renderVocabularyList(currentVocabularyEntries);
+});
 debugEnabledInput.addEventListener('change', (event) => {
   setDebugMode(event.target.checked);
 });
@@ -566,7 +693,7 @@ chrome.storage.onChanged?.addListener((changes, areaName) => {
     const entries = getVocabularyEntriesFromItems({
       [LOCAL_STORAGE_KEYS.vocabularyEntries]: changes[LOCAL_STORAGE_KEYS.vocabularyEntries]?.newValue
     });
-    renderVocabularyStatus(entries);
+    renderVocabulary(entries);
   }
 });
 

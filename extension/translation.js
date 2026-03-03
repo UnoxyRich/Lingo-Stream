@@ -100,7 +100,7 @@ async function getTranslationSettings() {
     sourceLanguage: settings.sourceLanguage ?? 'en',
     translationEndpoint: customEndpoint,
     translationTimeoutMs: settings.translationTimeoutMs ?? DEFAULT_TIMEOUT_MS,
-    saveVocabulary: settings.saveVocabulary === true
+    saveVocabulary: typeof settings.saveVocabulary === 'boolean' ? settings.saveVocabulary : true
   };
 }
 

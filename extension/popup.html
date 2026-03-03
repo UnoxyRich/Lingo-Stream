@@ -277,6 +277,58 @@
         font-size: 11px;
       }
 
+      .vocabulary-toolbar {
+        margin: 8px 0;
+      }
+
+      #vocabularyFilterInput {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 9px;
+        background: #f8fbff;
+        color: var(--text);
+        font-size: 12px;
+      }
+
+      .vocabulary-list {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f2f6fd;
+        max-height: 162px;
+        overflow: auto;
+      }
+
+      #vocabularyTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+
+      #vocabularyTable th,
+      #vocabularyTable td {
+        padding: 6px 8px;
+        border-bottom: 1px solid #dbe6f5;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      #vocabularyTable th {
+        position: sticky;
+        top: 0;
+        background: #eaf1fc;
+        color: var(--accent-strong);
+        font-size: 10px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .vocabulary-empty {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
       .status {
         min-height: 18px;
         margin: 8px 0 0;
@@ -337,7 +389,7 @@
         background: #f2f6fd;
       }
 
-      #logPanel.hidden {
+      .hidden {
         display: none;
       }
 
@@ -416,7 +468,7 @@
           <label for="saveVocabulary">Save translated vocabulary</label>
           <input id="saveVocabulary" name="saveVocabulary" type="checkbox" />
         </div>
-        <p class="hint">Optional: store translated words locally so you can export them later.</p>
+        <p class="hint">Store translated words locally so you can review and export them later.</p>
 
         <div class="button-row">
           <button id="saveButton" type="button">Save Settings</button>
@@ -442,6 +494,27 @@
         <div class="health-panel">
           <p class="section-title">Vocabulary</p>
           <p id="vocabularyStatus" class="status health-line" role="status" aria-live="polite">Saved words: 0</p>
+          <div class="vocabulary-toolbar">
+            <input
+              id="vocabularyFilterInput"
+              type="search"
+              placeholder="Filter source or translation"
+              aria-label="Filter saved vocabulary"
+            />
+          </div>
+          <p id="vocabularyEmptyState" class="vocabulary-empty">No saved words yet.</p>
+          <div id="vocabularyList" class="vocabulary-list hidden">
+            <table id="vocabularyTable" aria-label="Saved vocabulary table">
+              <thead>
+                <tr>
+                  <th scope="col">Source</th>
+                  <th scope="col">Translation</th>
+                  <th scope="col">Count</th>
+                </tr>
+              </thead>
+              <tbody id="vocabularyTableBody"></tbody>
+            </table>
+          </div>
           <div class="button-row">
             <button id="exportVocabularyButton" type="button">Export Vocabulary</button>
             <button id="clearVocabularyButton" type="button">Clear Saved</button>

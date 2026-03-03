@@ -5,6 +5,7 @@
   "description": "Replace meaningful subtitle words on YouTube with translated equivalents.",
   "permissions": [
     "storage",
+    "downloads",
     "activeTab",
     "scripting"
   ],
