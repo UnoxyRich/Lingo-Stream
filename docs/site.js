@@ -1308,6 +1308,51 @@ function attachInteractivePreview() {
   schedulePreviewUpdate();
 }
 
+function attachQuizShowcase() {
+  const cards = Array.from(document.querySelectorAll('.quiz-match-card[data-pair]'));
+  if (cards.length === 0) {
+    return;
+  }
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (reducedMotion.matches) {
+    return;
+  }
+
+  const groups = new Map();
+  for (const card of cards) {
+    const pair = card.dataset.pair || '';
+    if (!groups.has(pair)) {
+      groups.set(pair, []);
+    }
+    groups.get(pair).push(card);
+  }
+
+  const pairs = Array.from(groups.values()).filter((group) => group.length >= 2);
+  if (pairs.length === 0) {
+    return;
+  }
+
+  let cursor = 0;
+  const clearHighlights = () => {
+    for (const card of cards) {
+      card.classList.remove('is-demo-match');
+    }
+  };
+
+  const runStep = () => {
+    clearHighlights();
+    const current = pairs[cursor];
+    for (const card of current) {
+      card.classList.add('is-demo-match');
+    }
+    cursor = (cursor + 1) % pairs.length;
+  };
+
+  runStep();
+  window.setInterval(runStep, 1300);
+}
+
 function updateCopyrightYear() {
   const yearNode = document.getElementById('year');
   if (yearNode) {
@@ -1327,6 +1372,7 @@ function initializeSite() {
   attachSectionDepthEffect(sectionController.sections);
   attachSegmentScroll(sectionController);
   attachInteractivePreview();
+  attachQuizShowcase();
   updateCopyrightYear();
 }
 

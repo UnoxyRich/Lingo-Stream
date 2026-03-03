@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lingo Stream Quiz</title>
+    <meta
+      name="description"
+      content="Practice with Lingo Stream by matching words translated in the last hour."
+    />
+    <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./quiz.css" />
+  </head>
+  <body>
+    <div class="backdrop-glow glow-a" aria-hidden="true"></div>
+    <div class="backdrop-glow glow-b" aria-hidden="true"></div>
+    <div id="floatingPlusField" class="floating-plus-field" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Lingo Stream quiz home">
+        <img class="brand-logo" src="./logo.svg" alt="Lingo Stream logo" />
+        <span class="brand-name">Lingo Stream Quiz</span>
+      </a>
+      <div class="topbar-actions">
+        <button id="refreshButton" class="btn btn-ghost" type="button">Refresh Words</button>
+        <button id="nextRoundButton" class="btn btn-primary" type="button" disabled>New Round</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="quiz-shell">
+        <section class="hero-card" data-reveal>
+          <header>
+            <p class="eyebrow">Vocabulary Drill</p>
+            <h1>Match Translations Like a Daily Mission</h1>
+            <p class="lead">
+              Train on vocabulary translated in the last 60 minutes. Pick one source word and one translation
+              to form each correct pair.
+            </p>
+          </header>
+
+          <div class="hero-kpis">
+            <article class="kpi">
+              <span>Round</span>
+              <strong id="roundValue">1</strong>
+            </article>
+            <article class="kpi">
+              <span>Score</span>
+              <strong id="scoreValue">0</strong>
+            </article>
+            <article class="kpi">
+              <span>Pairs</span>
+              <strong id="pairValue">0/0</strong>
+            </article>
+            <article class="kpi">
+              <span>Accuracy</span>
+              <strong id="accuracyValue">100%</strong>
+            </article>
+          </div>
+
+          <p class="hero-note">
+            Tip: if you do not see enough cards, watch captions for a few minutes with vocabulary saving enabled,
+            then tap <strong>Refresh Words</strong>.
+          </p>
+        </section>
+
+        <section id="quizPanel" class="quiz-panel hidden" data-reveal data-delay="90">
+          <div class="panel-head">
+            <h2>Current Round</h2>
+          </div>
+
+          <div class="progress-wrap">
+            <p id="progressLabel" class="progress-label">Matched 0 of 0 pairs</p>
+            <div class="progress-track">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+          </div>
+
+          <p id="statusLine" class="status-line" aria-live="polite"></p>
+
+          <div class="board">
+            <section>
+              <p class="column-title">Source</p>
+              <div id="sourceChoices" class="choices"></div>
+            </section>
+            <section>
+              <p class="column-title">Translation</p>
+              <div id="translationChoices" class="choices"></div>
+            </section>
+          </div>
+        </section>
+      </div>
+
+      <section id="emptyState" class="empty-state hidden" data-reveal data-delay="140">
+        <h2>Not enough recent words yet</h2>
+        <p>You need at least 2 translated words saved in the past hour to start matching.</p>
+      </section>
+    </main>
+
+    <script type="module" src="./quiz.js"></script>
+  </body>
+</html>

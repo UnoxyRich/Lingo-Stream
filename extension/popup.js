@@ -32,6 +32,7 @@ const saveButton = document.getElementById('saveButton');
 const saveStatus = document.getElementById('saveStatus');
 const runtimeStatus = document.getElementById('runtimeStatus');
 const attachButton = document.getElementById('attachButton');
+const quizButton = document.getElementById('quizButton');
 const contentHealthStatus = document.getElementById('contentHealthStatus');
 const translationHealthStatus = document.getElementById('translationHealthStatus');
 const recheckHealthButton = document.getElementById('recheckHealthButton');
@@ -99,6 +100,15 @@ function showStatus(message, isError = false) {
 
 function showRuntimeStatus(message, isError = false) {
   setStatusElement(runtimeStatus, message, isError ? 'error' : (message ? 'ok' : 'neutral'));
+}
+
+function openQuizTab() {
+  const quizUrl = chrome.runtime.getURL('quiz.html');
+  chrome.tabs.create({ url: quizUrl }, () => {
+    if (chrome.runtime.lastError) {
+      showRuntimeStatus(`Unable to open quiz: ${chrome.runtime.lastError.message}`, true);
+    }
+  });
 }
 
 function isYouTubeUrl(url) {
@@ -654,6 +664,7 @@ replacementPercentageInput.addEventListener('input', (event) => {
 
 saveButton.addEventListener('click', saveSettings);
 attachButton.addEventListener('click', refreshActiveCaptions);
+quizButton?.addEventListener('click', openQuizTab);
 recheckHealthButton.addEventListener('click', () => {
   showRuntimeStatus('Rechecking extension health...');
   void refreshHealthPanel().then(() => {

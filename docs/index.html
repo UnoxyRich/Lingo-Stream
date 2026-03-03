@@ -31,6 +31,7 @@
         <a href="#hero">Home</a>
         <a href="#features">Features</a>
         <a href="#preview">Preview</a>
+        <a href="#quiz">Quiz</a>
         <a href="#install">Install</a>
       </nav>
       <a class="btn btn-primary btn-sm" href="#install">Install</a>
@@ -48,6 +49,9 @@
       </button>
       <button type="button" class="section-dot" data-target="preview">
         <span>Preview</span>
+      </button>
+      <button type="button" class="section-dot" data-target="quiz">
+        <span>Quiz</span>
       </button>
       <button type="button" class="section-dot" data-target="install">
         <span>Install</span>
@@ -243,6 +247,54 @@
                 </span>
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="quiz" class="screen quiz-screen">
+        <div class="screen-inner quiz-layout">
+          <div class="quiz-copy" data-reveal>
+            <p class="eyebrow">Quiz Mode</p>
+            <h2>Practice recent vocabulary with matching rounds</h2>
+            <p>
+              Lingo Stream can turn your last hour of translated words into a focused matching drill.
+              This keeps review short and contextual, right after watching.
+            </p>
+            <div class="quiz-points">
+              <article class="quiz-point">
+                <strong>Recent-only dataset</strong>
+                <span>Uses words translated in the previous 60 minutes.</span>
+              </article>
+              <article class="quiz-point">
+                <strong>Fast rounds</strong>
+                <span>Short matching sets designed for quick repetition.</span>
+              </article>
+              <article class="quiz-point">
+                <strong>Live scoring</strong>
+                <span>Tracks progress, accuracy, and current streak.</span>
+              </article>
+            </div>
+          </div>
+
+          <div class="quiz-preview-card" data-reveal data-delay="120">
+            <p class="quiz-preview-title">Matching Preview</p>
+            <div class="quiz-preview-grid">
+              <div class="quiz-preview-column">
+                <span class="quiz-preview-label">Source</span>
+                <button class="quiz-match-card" data-pair="1">skills</button>
+                <button class="quiz-match-card" data-pair="2">friend</button>
+                <button class="quiz-match-card" data-pair="3">watch</button>
+              </div>
+              <div class="quiz-preview-column">
+                <span class="quiz-preview-label">Translation</span>
+                <button class="quiz-match-card" data-pair="3">mirar</button>
+                <button class="quiz-match-card" data-pair="1">habilidades</button>
+                <button class="quiz-match-card" data-pair="2">amigo</button>
+              </div>
+            </div>
+            <p class="quiz-preview-note">
+              Cards animate through sample matches to demonstrate the quiz flow.
+            </p>
           </div>
         </div>
       </section>
