@@ -1,7 +1,8 @@
 const VOCABULARY_ENTRIES_KEY = 'vocabularyEntries';
 export const RECENT_WINDOW_MS = 60 * 60 * 1000;
-export const MIN_PAIRS_PER_ROUND = 2;
-export const MAX_PAIRS_PER_ROUND = 6;
+export const PAIRS_PER_ROUND = 5;
+export const MIN_PAIRS_PER_ROUND = PAIRS_PER_ROUND;
+export const MAX_PAIRS_PER_ROUND = PAIRS_PER_ROUND;
 const WRONG_FLASH_MS = 340;
 const SCORE_PER_CORRECT = 12;
 const SCORE_PENALTY_PER_WRONG = 3;
@@ -27,8 +28,11 @@ const elements = {
   sourceChoices: null,
   translationChoices: null,
   statusLine: null,
+  instructionLine: null,
   progressLabel: null,
   progressFill: null,
+  selectedSourceValue: null,
+  selectedTranslationValue: null,
   roundValue: null,
   pairValue: null,
   accuracyValue: null,
@@ -179,8 +183,11 @@ function cacheElements() {
   elements.sourceChoices = document.getElementById('sourceChoices');
   elements.translationChoices = document.getElementById('translationChoices');
   elements.statusLine = document.getElementById('statusLine');
+  elements.instructionLine = document.getElementById('instructionLine');
   elements.progressLabel = document.getElementById('progressLabel');
   elements.progressFill = document.getElementById('progressFill');
+  elements.selectedSourceValue = document.getElementById('selectedSourceValue');
+  elements.selectedTranslationValue = document.getElementById('selectedTranslationValue');
   elements.roundValue = document.getElementById('roundValue');
   elements.pairValue = document.getElementById('pairValue');
   elements.accuracyValue = document.getElementById('accuracyValue');
@@ -374,6 +381,54 @@ function updateStats() {
   elements.progressFill.style.width = `${progressPercent}%`;
 }
 
+function updateInstructionLine() {
+  if (!elements.instructionLine) {
+    return;
+  }
+
+  const totalPairs = state.round?.pairs.length ?? 0;
+  const matched = state.matchedIds.size;
+  if (!state.round || totalPairs === 0) {
+    elements.instructionLine.textContent = '';
+    return;
+  }
+
+  if (matched >= totalPairs) {
+    elements.instructionLine.textContent = 'Round complete. Tap "Next 5 Words" to continue.';
+    return;
+  }
+
+  if (!state.selectedSourceId && !state.selectedTranslationId) {
+    elements.instructionLine.textContent = 'Step 1: Choose a source word.';
+    return;
+  }
+
+  if (state.selectedSourceId && !state.selectedTranslationId) {
+    elements.instructionLine.textContent = 'Step 2: Choose the matching translation.';
+    return;
+  }
+
+  if (!state.selectedSourceId && state.selectedTranslationId) {
+    elements.instructionLine.textContent = 'Step 1: Choose a source word first.';
+    return;
+  }
+
+  elements.instructionLine.textContent = 'Checking your match...';
+}
+
+function updateSelectionPreview() {
+  const sourceLabel = state.round?.pairById.get(state.selectedSourceId)?.source ?? '-';
+  const translationLabel = state.round?.pairById.get(state.selectedTranslationId)?.translation ?? '-';
+
+  if (elements.selectedSourceValue) {
+    elements.selectedSourceValue.textContent = `Source: ${sourceLabel}`;
+  }
+
+  if (elements.selectedTranslationValue) {
+    elements.selectedTranslationValue.textContent = `Translation: ${translationLabel}`;
+  }
+}
+
 function buildChoiceButton({ kind, id, label, index }) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -434,6 +489,8 @@ function renderChoices() {
 
 function renderRound() {
   renderChoices();
+  updateInstructionLine();
+  updateSelectionPreview();
   updateStats();
 }
 
@@ -444,7 +501,7 @@ function clearSelections() {
 
 function onRoundCompleted() {
   elements.nextRoundButton.disabled = false;
-  setStatus('Round complete. Start a new round to continue.', 'good');
+  setStatus(`Great run. You matched all ${PAIRS_PER_ROUND} words.`, 'good');
 }
 
 function evaluateCurrentSelection() {
@@ -459,11 +516,12 @@ function evaluateCurrentSelection() {
     state.matchedIds.add(sourceId);
     state.correctMatches += 1;
     state.score += SCORE_PER_CORRECT;
+    const matchedCount = state.matchedIds.size;
     clearSelections();
     clearWrongFeedbackTimer();
     state.wrongSourceId = null;
     state.wrongTranslationId = null;
-    setStatus('Correct match.', 'good');
+    setStatus(`Correct. ${matchedCount}/${state.round.pairs.length} matched.`, 'good');
 
     if (state.matchedIds.size === state.round.pairs.length) {
       onRoundCompleted();
@@ -477,7 +535,7 @@ function evaluateCurrentSelection() {
   state.score = Math.max(0, state.score - SCORE_PENALTY_PER_WRONG);
   state.wrongSourceId = sourceId;
   state.wrongTranslationId = translationId;
-  setStatus('Not a match. Try again.', 'warn');
+  setStatus('Not a match. Keep the source word selected and try another translation.', 'warn');
   renderRound();
 
   clearWrongFeedbackTimer();
@@ -507,9 +565,18 @@ function handleChoiceClick(event) {
     return;
   }
 
+  clearWrongFeedbackTimer();
+  state.wrongSourceId = null;
+  state.wrongTranslationId = null;
+
   if (kind === 'source') {
     state.selectedSourceId = state.selectedSourceId === id ? null : id;
   } else if (kind === 'translation') {
+    if (!state.selectedSourceId) {
+      setStatus('Pick a source word first, then choose its translation.', 'warn');
+      updateInstructionLine();
+      return;
+    }
     state.selectedTranslationId = state.selectedTranslationId === id ? null : id;
   }
 
@@ -521,6 +588,15 @@ function showEmptyState(message) {
   elements.emptyState.classList.remove('hidden');
   elements.quizPanel.classList.add('hidden');
   setStatus('', 'neutral');
+  if (elements.instructionLine) {
+    elements.instructionLine.textContent = '';
+  }
+  if (elements.selectedSourceValue) {
+    elements.selectedSourceValue.textContent = 'Source: -';
+  }
+  if (elements.selectedTranslationValue) {
+    elements.selectedTranslationValue.textContent = 'Translation: -';
+  }
 
   const paragraph = elements.emptyState.querySelector('p');
   if (paragraph) {
@@ -536,7 +612,7 @@ function showQuizPanel() {
 function buildAndStartRound() {
   const round = buildMatchingRound(state.recentEntries);
   if (!round) {
-    showEmptyState('You need at least 2 unique source/translation pairs from the last hour.');
+    showEmptyState(`You need at least ${PAIRS_PER_ROUND} unique source/translation pairs from the last hour.`);
     return false;
   }
 
@@ -549,7 +625,7 @@ function buildAndStartRound() {
   clearWrongFeedbackTimer();
   elements.nextRoundButton.disabled = true;
   showQuizPanel();
-  setStatus('Match each source word with its translation.', 'neutral');
+  setStatus('Match all 5 words. Source first, translation second.', 'neutral');
   renderRound();
   return true;
 }
@@ -584,7 +660,7 @@ async function refreshWordsAndStart() {
 
 function startNewRound() {
   if (!Array.isArray(state.recentEntries) || state.recentEntries.length < MIN_PAIRS_PER_ROUND) {
-    showEmptyState('You need at least 2 recent words. Click "Refresh Words" after watching more captions.');
+    showEmptyState(`You need at least ${PAIRS_PER_ROUND} recent words. Click "Refresh" after watching more captions.`);
     return;
   }
 

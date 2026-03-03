@@ -20,6 +20,18 @@
   --topbar-border: rgba(213, 234, 217, 0.94);
   --plus-color: rgba(43, 125, 69, 0.22);
   --choice-bg: #f6fdf7;
+  --choice-face: #ffffff;
+  --choice-border: #d7dce3;
+  --choice-depth: #c5cbd2;
+  --choice-selected-face: #e8f3ff;
+  --choice-selected-border: #79b6ff;
+  --choice-selected-depth: #5f9de7;
+  --choice-wrong-face: #ffe9ee;
+  --choice-wrong-border: #f28aa0;
+  --choice-wrong-depth: #df6d88;
+  --choice-matched-face: #eceff3;
+  --choice-matched-border: #c8ced6;
+  --choice-matched-depth: #b4bcc7;
   --shadow-soft: 0 14px 28px rgba(20, 56, 30, 0.14);
 }
 
@@ -45,6 +57,18 @@
     --topbar-border: rgba(43, 80, 56, 0.95);
     --plus-color: rgba(117, 221, 146, 0.2);
     --choice-bg: #12261a;
+    --choice-face: #14251a;
+    --choice-border: #355845;
+    --choice-depth: #2a4939;
+    --choice-selected-face: #193049;
+    --choice-selected-border: #4a8fd7;
+    --choice-selected-depth: #3a76b4;
+    --choice-wrong-face: #43232d;
+    --choice-wrong-border: #a95b71;
+    --choice-wrong-depth: #86485a;
+    --choice-matched-face: #1b2328;
+    --choice-matched-border: #3a4650;
+    --choice-matched-depth: #2e3942;
     --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.38);
   }
 }
@@ -177,9 +201,9 @@ body {
 
 .btn {
   border: 0;
-  border-radius: 9px;
-  padding: 8px 11px;
-  font-size: 12px;
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13px;
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
@@ -211,15 +235,16 @@ body {
 }
 
 main {
-  width: min(1120px, calc(100% - 18px));
+  width: min(1240px, calc(100% - 28px));
   margin: 0 auto;
-  padding: 16px 0 24px;
+  padding: 22px 0 36px;
 }
 
 .quiz-shell {
   display: grid;
-  grid-template-columns: 0.72fr 1.28fr;
-  gap: 14px;
+  grid-template-columns: minmax(320px, 0.78fr) minmax(560px, 1.22fr);
+  gap: 24px;
+  align-items: start;
 }
 
 .hero-card,
@@ -232,11 +257,11 @@ main {
 }
 
 .hero-card {
-  padding: 16px;
+  padding: 22px;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   align-self: start;
   position: sticky;
   top: 76px;
@@ -260,26 +285,47 @@ h3 {
 }
 
 h1 {
-  font-size: clamp(30px, 4.2vw, 44px);
-  max-width: 15ch;
+  font-size: clamp(30px, 4vw, 40px);
+  max-width: 12ch;
 }
 
 .lead {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
-  line-height: 1.6;
-  font-size: 15px;
+  line-height: 1.55;
+  font-size: 16px;
+}
+
+.duo-steps {
+  margin-top: 4px;
+  border: 1px solid rgba(62, 155, 95, 0.24);
+  border-radius: 14px;
+  background: var(--panel-mid);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.duo-steps p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.duo-steps strong {
+  color: var(--accent-strong);
 }
 
 .hero-kpis {
-  margin-top: 8px;
+  margin-top: 6px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .kpi {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(62, 155, 95, 0.2);
   border-radius: 12px;
   background: var(--panel-mid);
@@ -300,10 +346,10 @@ h1 {
 }
 
 .hero-note {
-  margin-top: 4px;
+  margin-top: 2px;
   border: 1px solid rgba(62, 155, 95, 0.25);
   border-radius: 13px;
-  padding: 10px;
+  padding: 12px;
   background: linear-gradient(160deg, var(--panel-mid), var(--panel-soft));
   font-size: 12px;
   color: var(--muted);
@@ -311,7 +357,7 @@ h1 {
 }
 
 .quiz-panel {
-  padding: 14px;
+  padding: 20px;
 }
 
 .panel-head {
@@ -322,7 +368,7 @@ h1 {
 }
 
 .panel-head h2 {
-  font-size: 18px;
+  font-size: 22px;
 }
 
 .stats {
@@ -355,7 +401,7 @@ h1 {
 }
 
 .progress-wrap {
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .progress-label {
@@ -381,9 +427,54 @@ h1 {
 
 .status-line {
   margin: 8px 0 0;
-  min-height: 18px;
+  min-height: 20px;
   color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.instruction-line {
+  margin: 14px 0 0;
+  min-height: 20px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.selection-tray {
+  margin-top: 12px;
+  border: 1px solid rgba(62, 155, 95, 0.24);
+  border-radius: 13px;
+  background: var(--panel-mid);
+  padding: 9px 10px;
+}
+
+.selection-title {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.selection-values {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.selection-pill {
+  border: 1px solid rgba(62, 155, 95, 0.24);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--choice-bg);
   font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-line.good {
@@ -395,15 +486,22 @@ h1 {
 }
 
 .board {
-  margin-top: 10px;
+  margin-top: 16px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 16px;
+}
+
+.board > section {
+  border: 1px solid rgba(62, 155, 95, 0.24);
+  border-radius: 16px;
+  background: var(--panel-mid);
+  padding: 12px;
 }
 
 .column-title {
-  margin: 0 0 8px;
-  font-size: 10px;
+  margin: 0 0 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent-strong);
@@ -412,50 +510,81 @@ h1 {
 
 .choices {
   display: grid;
-  gap: 7px;
-  max-height: min(56vh, 440px);
+  gap: 10px;
+  max-height: min(58vh, 560px);
   overflow-y: auto;
-  padding-right: 1px;
+  padding-right: 2px;
 }
 
 .choice {
   width: 100%;
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--choice-bg);
+  min-height: 58px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--choice-border);
+  border-radius: 16px;
+  background: var(--choice-face);
   color: var(--text);
-  padding: 9px 10px;
-  font-size: 13px;
-  font-weight: 700;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
   cursor: pointer;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  box-shadow: inset 0 -4px 0 0 var(--choice-depth);
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    opacity 120ms ease,
+    color 120ms ease;
+}
+
+.choice:focus-visible {
+  outline: none;
+  border-color: var(--choice-selected-border);
+  box-shadow:
+    inset 0 -4px 0 0 var(--choice-selected-depth),
+    0 0 0 3px rgba(93, 157, 224, 0.2);
 }
 
 .choice:hover {
-  transform: translateY(-1px);
-  border-color: rgba(62, 155, 95, 0.44);
+  transform: translateY(-2px);
+}
+
+.choice:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 -1px 0 0 var(--choice-depth);
 }
 
 .choice.selected {
-  border-color: rgba(62, 155, 95, 0.74);
-  box-shadow: 0 0 0 3px rgba(62, 155, 95, 0.14);
+  border-color: var(--choice-selected-border);
+  background: var(--choice-selected-face);
+  box-shadow:
+    inset 0 -4px 0 0 var(--choice-selected-depth),
+    0 0 0 2px rgba(93, 157, 224, 0.14);
 }
 
 .choice.matched {
-  border-color: rgba(29, 127, 79, 0.62);
-  background: rgba(29, 127, 79, 0.14);
+  border-color: var(--choice-matched-border);
+  background: var(--choice-matched-face);
+  color: color-mix(in srgb, var(--text) 46%, #7e8894 54%);
+  box-shadow: inset 0 -4px 0 0 var(--choice-matched-depth);
+  opacity: 0.48;
   animation: choicePop 300ms ease;
 }
 
 .choice.wrong {
-  border-color: rgba(182, 59, 88, 0.58);
-  background: rgba(182, 59, 88, 0.13);
+  border-color: var(--choice-wrong-border);
+  background: var(--choice-wrong-face);
+  box-shadow: inset 0 -4px 0 0 var(--choice-wrong-depth);
   animation: choiceShake 240ms linear;
 }
 
 .empty-state {
-  padding: 14px;
+  padding: 20px;
 }
 
 .empty-state h2 {
@@ -489,6 +618,7 @@ h1 {
 @media (max-width: 1040px) {
   .quiz-shell {
     grid-template-columns: 1fr;
+    gap: 18px;
   }
 
   .hero-card {
@@ -523,6 +653,14 @@ h1 {
   }
 
   .board {
+    grid-template-columns: 1fr;
+  }
+
+  .board > section {
+    padding: 10px;
+  }
+
+  .selection-values {
     grid-template-columns: 1fr;
   }
 

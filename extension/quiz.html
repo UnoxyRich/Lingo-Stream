@@ -29,7 +29,7 @@
       </a>
       <div class="topbar-actions">
         <button id="refreshButton" class="btn btn-ghost" type="button">Refresh</button>
-        <button id="nextRoundButton" class="btn btn-primary" type="button" disabled>Next Round</button>
+        <button id="nextRoundButton" class="btn btn-primary" type="button" disabled>Next 5 Words</button>
       </div>
     </header>
 
@@ -38,11 +38,15 @@
         <section class="hero-card" data-reveal>
           <header>
             <p class="eyebrow">Vocabulary Drill</p>
-            <h1>Match Translations Like a Daily Mission</h1>
-            <p class="lead">
-              Train on vocabulary translated in the last 60 minutes. Match one source card with one translation card.
-            </p>
+            <h1>Match 5 Words</h1>
+            <p class="lead">Like Duolingo: pick one source word, then pick its translation.</p>
           </header>
+
+          <div class="duo-steps">
+            <p><strong>Step 1</strong> Tap a source word.</p>
+            <p><strong>Step 2</strong> Tap the matching translation.</p>
+            <p><strong>Goal</strong> Clear all 5 pairs to finish the round.</p>
+          </div>
 
           <div class="hero-kpis">
             <article class="kpi">
@@ -64,14 +68,14 @@
           </div>
 
           <p class="hero-note">
-            Tip: if you do not see enough cards, watch captions for a few minutes with vocabulary saving enabled,
-            then tap <strong>Refresh</strong>.
+            Each round always uses 5 recent saved words from the past hour. If this page is empty, watch captions
+            with saving enabled and tap <strong>Refresh</strong>.
           </p>
         </section>
 
         <section id="quizPanel" class="quiz-panel hidden" data-reveal data-delay="90">
           <div class="panel-head">
-            <h2>Current Round</h2>
+            <h2>Round Board</h2>
           </div>
 
           <div class="progress-wrap">
@@ -81,15 +85,23 @@
             </div>
           </div>
 
+          <p id="instructionLine" class="instruction-line" aria-live="polite"></p>
           <p id="statusLine" class="status-line" aria-live="polite"></p>
+          <div class="selection-tray" aria-live="polite">
+            <p class="selection-title">Current Picks</p>
+            <div class="selection-values">
+              <span id="selectedSourceValue" class="selection-pill">Source: -</span>
+              <span id="selectedTranslationValue" class="selection-pill">Translation: -</span>
+            </div>
+          </div>
 
           <div class="board">
             <section>
-              <p class="column-title">Source</p>
+              <p class="column-title">Step 1: Source Word</p>
               <div id="sourceChoices" class="choices"></div>
             </section>
             <section>
-              <p class="column-title">Translation</p>
+              <p class="column-title">Step 2: Translation</p>
               <div id="translationChoices" class="choices"></div>
             </section>
           </div>
@@ -98,7 +110,7 @@
 
       <section id="emptyState" class="empty-state hidden" data-reveal data-delay="140">
         <h2>Not enough recent words yet</h2>
-        <p>You need at least 2 translated words saved in the past hour to start matching.</p>
+        <p>You need at least 5 translated words saved in the past hour to start matching.</p>
       </section>
     </main>
 
