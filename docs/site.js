@@ -694,13 +694,17 @@ function getSlideSections() {
   return Array.from(document.querySelectorAll('main .screen[id]'));
 }
 
+function isCompactViewport() {
+  return window.matchMedia('(max-width: 1040px)').matches;
+}
+
 function attachSectionDepthEffect(sections) {
   if (!Array.isArray(sections) || sections.length === 0) {
     return;
   }
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  if (reducedMotion.matches) {
+  if (reducedMotion.matches || isCompactViewport()) {
     for (const section of sections) {
       section.style.setProperty('--section-shift', '0');
     }
@@ -710,6 +714,14 @@ function attachSectionDepthEffect(sections) {
   let ticking = false;
 
   const update = () => {
+    if (isCompactViewport()) {
+      for (const section of sections) {
+        section.style.setProperty('--section-shift', '0');
+      }
+      ticking = false;
+      return;
+    }
+
     const viewportCenter = window.innerHeight / 2;
     const normalizer = Math.max(window.innerHeight * 0.7, 1);
 
@@ -742,6 +754,13 @@ function getSectionCenterOffset(section) {
 }
 
 function getCenteredScrollTop(section) {
+  if (isCompactViewport()) {
+    const topbar = document.getElementById('topbar');
+    const offset = (topbar?.offsetHeight || 64) + 10;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    return clamp(section.offsetTop - offset, 0, maxScroll);
+  }
+
   const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
   const target = getSectionCenterOffset(section) - window.innerHeight / 2;
   return clamp(target, 0, maxScroll);
@@ -958,7 +977,7 @@ function attachSegmentScroll(sectionController) {
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const coarsePointer = window.matchMedia('(pointer: coarse)');
-  if (reducedMotion.matches || coarsePointer.matches) {
+  if (reducedMotion.matches || coarsePointer.matches || isCompactViewport()) {
     return;
   }
 
@@ -985,6 +1004,10 @@ function attachSegmentScroll(sectionController) {
   };
 
   const onWheel = (event) => {
+    if (isCompactViewport()) {
+      return;
+    }
+
     if (event.ctrlKey) {
       return;
     }
@@ -1019,6 +1042,10 @@ function attachSegmentScroll(sectionController) {
   };
 
   const onKeydown = (event) => {
+    if (isCompactViewport()) {
+      return;
+    }
+
     if (isEditableTarget(event.target)) {
       return;
     }

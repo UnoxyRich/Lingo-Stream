@@ -137,14 +137,14 @@ body {
   top: 0;
   z-index: 20;
   margin: 0 auto;
-  width: min(1300px, calc(100% - 16px));
+  width: min(1180px, calc(100% - 14px));
   border: 1px solid var(--topbar-border);
   border-top: 0;
-  border-radius: 0 0 24px 24px;
+  border-radius: 0 0 18px 18px;
   background: var(--panel-mid);
   backdrop-filter: blur(11px);
   box-shadow: var(--shadow-soft);
-  padding: 12px 14px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -160,13 +160,13 @@ body {
 }
 
 .brand-logo {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
 }
 
 .brand-name {
   font-family: "Sora", "Manrope", sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -177,9 +177,9 @@ body {
 
 .btn {
   border: 0;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-size: 12px;
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
@@ -211,15 +211,15 @@ body {
 }
 
 main {
-  width: min(1200px, calc(100% - 22px));
+  width: min(1120px, calc(100% - 18px));
   margin: 0 auto;
-  padding: 22px 0 30px;
+  padding: 16px 0 24px;
 }
 
 .quiz-shell {
   display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  gap: 18px;
+  grid-template-columns: 0.72fr 1.28fr;
+  gap: 14px;
 }
 
 .hero-card,
@@ -232,11 +232,14 @@ main {
 }
 
 .hero-card {
-  padding: 20px;
-  min-height: 540px;
+  padding: 16px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 12px;
+  align-self: start;
+  position: sticky;
+  top: 76px;
 }
 
 .eyebrow {
@@ -262,21 +265,21 @@ h1 {
 }
 
 .lead {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: var(--muted);
   line-height: 1.6;
   font-size: 15px;
 }
 
 .hero-kpis {
-  margin-top: 18px;
+  margin-top: 8px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .kpi {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid rgba(62, 155, 95, 0.2);
   border-radius: 12px;
   background: var(--panel-mid);
@@ -293,22 +296,22 @@ h1 {
   display: block;
   margin-top: 4px;
   color: var(--accent-strong);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .hero-note {
-  margin-top: 14px;
+  margin-top: 4px;
   border: 1px solid rgba(62, 155, 95, 0.25);
   border-radius: 13px;
-  padding: 12px;
+  padding: 10px;
   background: linear-gradient(160deg, var(--panel-mid), var(--panel-soft));
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.55;
 }
 
 .quiz-panel {
-  padding: 16px;
+  padding: 14px;
 }
 
 .panel-head {
@@ -319,7 +322,7 @@ h1 {
 }
 
 .panel-head h2 {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .stats {
@@ -352,7 +355,7 @@ h1 {
 }
 
 .progress-wrap {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .progress-label {
@@ -377,10 +380,10 @@ h1 {
 }
 
 .status-line {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   min-height: 18px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .status-line.good {
@@ -392,10 +395,10 @@ h1 {
 }
 
 .board {
-  margin-top: 12px;
+  margin-top: 10px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .column-title {
@@ -409,7 +412,10 @@ h1 {
 
 .choices {
   display: grid;
-  gap: 8px;
+  gap: 7px;
+  max-height: min(56vh, 440px);
+  overflow-y: auto;
+  padding-right: 1px;
 }
 
 .choice {
@@ -419,8 +425,8 @@ h1 {
   border-radius: 12px;
   background: var(--choice-bg);
   color: var(--text);
-  padding: 11px 12px;
-  font-size: 14px;
+  padding: 9px 10px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
@@ -449,7 +455,7 @@ h1 {
 }
 
 .empty-state {
-  padding: 18px;
+  padding: 14px;
 }
 
 .empty-state h2 {
@@ -487,6 +493,12 @@ h1 {
 
   .hero-card {
     min-height: auto;
+    position: static;
+  }
+
+  .choices {
+    max-height: none;
+    overflow-y: visible;
   }
 }
 

@@ -24,8 +24,8 @@
 
       body {
         margin: 0;
-        width: 372px;
-        min-width: 372px;
+        width: 356px;
+        min-width: 356px;
         color: var(--text);
         font-family: "Manrope", "Avenir Next", "Trebuchet MS", sans-serif;
         background:
@@ -35,16 +35,16 @@
       }
 
       main {
-        padding: 12px;
+        padding: 10px;
       }
 
       .top-card {
         border: 1px solid rgba(213, 234, 217, 0.94);
-        border-radius: 18px;
+        border-radius: 14px;
         background: rgba(255, 255, 255, 0.84);
         box-shadow: var(--shadow-soft);
-        padding: 12px;
-        margin-bottom: 10px;
+        padding: 9px 10px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -58,8 +58,8 @@
       }
 
       .brand-logo {
-        width: 34px;
-        height: 34px;
+        width: 30px;
+        height: 30px;
       }
 
       .eyebrow {
@@ -74,14 +74,14 @@
       .hero-title {
         margin: 3px 0 0;
         font-family: "Sora", "Manrope", sans-serif;
-        font-size: 16px;
+        font-size: 15px;
         line-height: 1.2;
       }
 
       .hero-subtitle {
         margin: 2px 0 0;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 10px;
       }
 
       .live-pill {
@@ -107,7 +107,7 @@
         border: 1px solid rgba(62, 155, 95, 0.35);
         background: linear-gradient(120deg, rgba(62, 155, 95, 0.14), rgba(43, 125, 69, 0.2));
         color: var(--accent-strong);
-        padding: 6px 10px;
+        padding: 5px 9px;
         font-size: 10px;
         letter-spacing: 0.07em;
         text-transform: uppercase;
@@ -116,20 +116,38 @@
 
       .panel {
         border: 1px solid rgba(213, 234, 217, 0.86);
-        border-radius: 18px;
-        padding: 14px;
+        border-radius: 14px;
+        padding: 10px;
         background: rgba(255, 255, 255, 0.78);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
 
       .field,
       .field-inline {
-        margin-bottom: 12px;
+        margin: 0;
       }
 
       .field {
         display: flex;
         flex-direction: column;
-        gap: 7px;
+        gap: 6px;
+      }
+
+      .field .hint {
+        margin-top: 1px;
+      }
+
+      .span-2 {
+        grid-column: 1 / -1;
+      }
+
+      .button-row,
+      .status,
+      .health-panel,
+      .panel > details {
+        grid-column: 1 / -1;
       }
 
       .field-inline {
@@ -140,7 +158,7 @@
       }
 
       label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
       }
 
@@ -148,11 +166,11 @@
       input[type="range"] {
         width: 100%;
         border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px 10px;
+        border-radius: 9px;
+        padding: 7px 9px;
         background: #f6fdf7;
         color: var(--text);
-        font-size: 13px;
+        font-size: 12px;
       }
 
       input[type="range"] {
@@ -186,7 +204,7 @@
         margin: 0;
         color: var(--muted);
         line-height: 1.45;
-        font-size: 11px;
+        font-size: 10px;
       }
 
       .range-row {
@@ -200,18 +218,18 @@
       }
 
       #replacementPercentageValue {
-        min-width: 38px;
+        min-width: 34px;
         text-align: right;
         color: var(--accent-strong);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 800;
       }
 
       .switch-row {
         border: 1px solid var(--line);
-        border-radius: 10px;
+        border-radius: 9px;
         background: #f6fdf7;
-        padding: 8px 10px;
+        padding: 7px 8px;
       }
 
       input[type="checkbox"] {
@@ -223,8 +241,8 @@
 
       .button-row {
         display: flex;
-        gap: 9px;
-        margin-top: 3px;
+        gap: 7px;
+        margin-top: 1px;
       }
 
       .section-title {
@@ -238,9 +256,9 @@
 
       button {
         border: 0;
-        border-radius: 10px;
-        padding: 9px 12px;
-        font-size: 12px;
+        border-radius: 9px;
+        padding: 8px 10px;
+        font-size: 11px;
         font-weight: 800;
         letter-spacing: 0.01em;
         cursor: pointer;
@@ -282,38 +300,49 @@
       }
 
       .health-panel {
-        margin-top: 10px;
+        margin-top: 0;
         border: 1px dashed var(--line);
-        border-radius: 12px;
-        padding: 10px;
+        border-radius: 11px;
+        padding: 9px;
         background: rgba(248, 252, 248, 0.84);
+      }
+
+      .health-panel summary {
+        margin: -9px -9px 8px;
+        padding: 8px 9px;
+        border-bottom: 1px dashed var(--line);
+        color: var(--accent-strong);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 800;
       }
 
       .health-line {
         margin: 0 0 4px;
         min-height: 14px;
-        font-size: 11px;
+        font-size: 10px;
       }
 
       .vocabulary-toolbar {
-        margin: 8px 0;
+        margin: 6px 0;
       }
 
       #vocabularyFilterInput {
         width: 100%;
         border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 7px 9px;
+        padding: 6px 8px;
         background: #f6fdf7;
         color: var(--text);
-        font-size: 12px;
+        font-size: 11px;
       }
 
       .vocabulary-list {
         border: 1px solid var(--line);
         border-radius: 8px;
         background: #eff8f0;
-        max-height: 162px;
+        max-height: 132px;
         overflow: auto;
       }
 
@@ -344,13 +373,13 @@
       .vocabulary-empty {
         margin: 6px 0 0;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 10px;
       }
 
       .status {
-        min-height: 18px;
-        margin: 8px 0 0;
-        font-size: 12px;
+        min-height: 16px;
+        margin: 4px 0 0;
+        font-size: 11px;
         color: var(--muted);
       }
 
@@ -363,21 +392,21 @@
       }
 
       details {
-        margin-top: 12px;
+        margin-top: 0;
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: 11px;
         background: rgba(248, 252, 248, 0.84);
       }
 
       summary {
-        padding: 10px 12px;
-        font-size: 12px;
+        padding: 8px 9px;
+        font-size: 11px;
         font-weight: 800;
         cursor: pointer;
       }
 
       .debug-content {
-        padding: 0 12px 12px;
+        padding: 0 9px 9px;
       }
 
       .debug-controls {
@@ -389,7 +418,7 @@
 
       #clearLogsButton {
         width: 100%;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         color: var(--accent-strong);
         border: 1px solid rgba(62, 155, 95, 0.3);
         background: rgba(62, 155, 95, 0.08);
@@ -398,11 +427,11 @@
       #logPanel {
         border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 8px;
-        height: 136px;
+        padding: 7px;
+        height: 108px;
         overflow-y: auto;
         font-family: "Consolas", "JetBrains Mono", monospace;
-        font-size: 12px;
+        font-size: 11px;
         white-space: pre-wrap;
         background: #eff8f0;
       }
@@ -414,7 +443,15 @@
       @media (max-width: 420px) {
         body {
           width: 100%;
-          min-width: 320px;
+          min-width: 300px;
+        }
+
+        .panel {
+          grid-template-columns: 1fr;
+        }
+
+        .span-2 {
+          grid-column: auto;
         }
       }
     </style>
@@ -437,7 +474,7 @@
       </header>
 
       <section class="panel">
-        <div class="field">
+        <div class="field span-2">
           <label for="translationProvider">Translation provider</label>
           <select id="translationProvider" name="translationProvider">
             <option value="auto">Auto fallback (Recommended)</option>
@@ -489,7 +526,7 @@
           <label for="saveVocabulary">Save translated vocabulary</label>
           <input id="saveVocabulary" name="saveVocabulary" type="checkbox" />
         </div>
-        <p class="hint">Store translated words locally so you can review and export them later.</p>
+        <p class="hint span-2">Store translated words locally so you can review and export them later.</p>
 
         <div class="button-row">
           <button id="saveButton" type="button">Save Settings</button>
@@ -499,8 +536,8 @@
         <p id="saveStatus" class="status" role="status" aria-live="polite"></p>
         <p id="runtimeStatus" class="status" role="status" aria-live="polite"></p>
 
-        <div class="health-panel">
-          <p class="section-title">Health Check</p>
+        <details class="health-panel span-2" open>
+          <summary>Health Check</summary>
           <p id="contentHealthStatus" class="status health-line" role="status" aria-live="polite">
             Content script: checking active tab...
           </p>
@@ -510,10 +547,10 @@
           <div class="button-row">
             <button id="recheckHealthButton" type="button">Recheck Health</button>
           </div>
-        </div>
+        </details>
 
-        <div class="health-panel">
-          <p class="section-title">Vocabulary</p>
+        <details class="health-panel span-2">
+          <summary>Vocabulary</summary>
           <p id="vocabularyStatus" class="status health-line" role="status" aria-live="polite">Saved words: 0</p>
           <div class="vocabulary-toolbar">
             <input
@@ -540,9 +577,9 @@
             <button id="exportVocabularyButton" type="button">Export Vocabulary</button>
             <button id="clearVocabularyButton" type="button">Clear Saved</button>
           </div>
-        </div>
+        </details>
 
-        <details>
+        <details class="span-2">
           <summary>Debug Tools</summary>
           <div class="debug-content">
             <div class="debug-controls">
