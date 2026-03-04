@@ -88,95 +88,11 @@ const TRANSLATION_MISS_TTL_MS = 30 * 1000;
 const SOURCE_LANGUAGE = 'en';
 const AUTO_PROVIDER_ORDER = ['google', 'libre', 'apertium', 'mymemory'];
 const LIBRE_ENDPOINTS = ['https://translate.argosopentech.com/translate', 'https://libretranslate.com/translate'];
-const EASE_STANDARD = 'cubicBezier(0.22, 1, 0.36, 1)';
-const EASE_GENTLE = 'cubicBezier(0.25, 0.46, 0.45, 0.94)';
-const EASE_POP = 'cubicBezier(0.34, 1.56, 0.64, 1)';
-const EASE_TEXT = 'cubicBezier(0.16, 1, 0.3, 1)';
 const translationCache = new Map();
 const translationMissCache = new Map();
-const activeTextSplitByNode = new WeakMap();
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
-}
-
-function getAnime() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return typeof window.anime === 'function' ? window.anime : null;
-}
-
-function getAnimeText() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const animeTextApi = window.anime4;
-  if (!animeTextApi || typeof animeTextApi.animate !== 'function' || typeof animeTextApi.splitText !== 'function') {
-    return null;
-  }
-
-  return animeTextApi;
-}
-
-function prefersReducedMotion() {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false;
-  }
-
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function animateNode(targets, config) {
-  const anime = getAnime();
-  if (!anime || prefersReducedMotion()) {
-    return null;
-  }
-
-  anime.remove(targets);
-  return anime({
-    targets,
-    ...config
-  });
-}
-
-function animateTextSplit(node, options = {}) {
-  if (!(node instanceof HTMLElement) || prefersReducedMotion()) {
-    return;
-  }
-
-  const animeText = getAnimeText();
-  if (!animeText) {
-    return;
-  }
-
-  const previousSplit = activeTextSplitByNode.get(node);
-  if (previousSplit && typeof previousSplit.revert === 'function') {
-    previousSplit.revert();
-  }
-
-  const split = animeText.splitText(node, { chars: true, words: false });
-  const chars = Array.isArray(split?.chars) ? split.chars : [];
-  if (chars.length === 0) {
-    return;
-  }
-
-  activeTextSplitByNode.set(node, split);
-  animeText.animate(chars, {
-    y: [options.fromY ?? '0.38em', '0em'],
-    opacity: [0, 1],
-    duration: options.duration ?? 420,
-    delay: animeText.stagger(options.stagger ?? 8),
-    ease: options.ease ?? EASE_TEXT,
-    onComplete: () => {
-      if (activeTextSplitByNode.get(node) === split) {
-        split.revert();
-        activeTextSplitByNode.delete(node);
-      }
-    }
-  });
 }
 
 function escapeHtml(value) {
@@ -594,18 +510,10 @@ function animateLine(node, content) {
     return;
   }
 
+  node.classList.remove('line-change');
   node.innerHTML = content;
-  const animation = animateNode(node, {
-    opacity: [0.15, 1],
-    translateY: [6, 0],
-    duration: 280,
-    easing: EASE_STANDARD
-  });
-  if (!animation) {
-    node.classList.remove('line-change');
-    void node.offsetWidth;
-    node.classList.add('line-change');
-  }
+  void node.offsetWidth;
+  node.classList.add('line-change');
 }
 
 function attachRepositoryLinks(repositoryUrl) {
@@ -651,8 +559,6 @@ function attachRevealAnimation() {
     return;
   }
 
-  const anime = getAnime();
-
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -661,21 +567,8 @@ function attachRevealAnimation() {
         }
 
         const delayMs = Number.parseInt(entry.target.dataset.delay || '0', 10);
+        entry.target.style.transitionDelay = `${Math.max(0, delayMs)}ms`;
         entry.target.classList.add('visible');
-        if (anime && !prefersReducedMotion()) {
-          anime.remove(entry.target);
-          anime({
-            targets: entry.target,
-            opacity: [0, 1],
-            translateY: [20, 0],
-            scale: [0.988, 1],
-            duration: 620,
-            delay: Math.max(0, delayMs),
-            easing: EASE_STANDARD
-          });
-        } else {
-          entry.target.style.transitionDelay = `${Math.max(0, delayMs)}ms`;
-        }
         observer.unobserve(entry.target);
       }
     },
@@ -699,8 +592,6 @@ function attachTopbarContraction() {
     const threshold = Math.max(44, window.innerHeight * 0.1);
     const compact = window.scrollY > threshold;
     topbar.classList.toggle('compact', compact);
-    const snapOffset = Math.round(topbar.getBoundingClientRect().height + 12);
-    document.documentElement.style.setProperty('--snap-offset', `${snapOffset}px`);
     ticking = false;
   };
 
@@ -828,133 +719,7 @@ function attachBackgroundParallax() {
 }
 
 function getSlideSections() {
-  const allSections = Array.from(document.querySelectorAll('main .screen[id]')).filter(
-    (section) => section instanceof HTMLElement
-  );
-  if (allSections.length === 0) {
-    return [];
-  }
-
-  const sectionById = new Map();
-  for (const section of allSections) {
-    const sectionId = String(section.id || '').trim();
-    if (!sectionId || sectionById.has(sectionId)) {
-      continue;
-    }
-    sectionById.set(sectionId, section);
-  }
-
-  const ordered = [];
-  for (const sectionId of PRIMARY_SECTION_ORDER) {
-    const section = sectionById.get(sectionId);
-    if (!section) {
-      continue;
-    }
-
-    ordered.push(section);
-    sectionById.delete(sectionId);
-  }
-
-  for (const section of allSections) {
-    const sectionId = String(section.id || '').trim();
-    if (!sectionId || !sectionById.has(sectionId)) {
-      continue;
-    }
-
-    ordered.push(section);
-    sectionById.delete(sectionId);
-  }
-
-  return ordered;
-}
-
-const PRIMARY_SECTION_ORDER = Object.freeze(['hero', 'features', 'preview', 'quiz', 'install']);
-
-const DEFAULT_DOT_LABEL_BY_SECTION_ID = Object.freeze({
-  hero: 'Home',
-  features: 'Features',
-  preview: 'Preview',
-  quiz: 'Quiz',
-  install: 'Install'
-});
-
-function buildDotLabelFromSection(section) {
-  if (!(section instanceof HTMLElement)) {
-    return '';
-  }
-
-  const explicitLabel = (section.dataset.dotLabel || '').trim();
-  if (explicitLabel) {
-    return explicitLabel;
-  }
-
-  const idLabel = (section.id || '').trim();
-  if (!idLabel) {
-    return '';
-  }
-
-  const defaultLabel = DEFAULT_DOT_LABEL_BY_SECTION_ID[idLabel.toLowerCase()];
-  if (defaultLabel) {
-    return defaultLabel;
-  }
-
-  const heading = section.querySelector('h1, h2, h3');
-  const headingText = (heading?.textContent || '').trim();
-  if (headingText) {
-    return headingText;
-  }
-
-  return idLabel.charAt(0).toUpperCase() + idLabel.slice(1);
-}
-
-function syncSectionDotsWithSections(sections) {
-  const dotsNav = document.querySelector('.section-dots');
-  if (!(dotsNav instanceof HTMLElement)) {
-    return [];
-  }
-
-  const existingDots = new Map();
-  for (const node of Array.from(dotsNav.querySelectorAll('.section-dot[data-target]'))) {
-    if (!(node instanceof HTMLButtonElement)) {
-      continue;
-    }
-    const target = node.dataset.target;
-    if (!target) {
-      continue;
-    }
-    existingDots.set(target, node);
-  }
-
-  const nextDots = [];
-  const seenTargets = new Set();
-
-  for (const section of sections) {
-    const sectionId = String(section.id || '').trim();
-    if (!sectionId || seenTargets.has(sectionId)) {
-      continue;
-    }
-
-    seenTargets.add(sectionId);
-    let dot = existingDots.get(sectionId);
-    if (!(dot instanceof HTMLButtonElement)) {
-      dot = document.createElement('button');
-      dot.type = 'button';
-      dot.className = 'section-dot';
-    }
-    dot.dataset.target = sectionId;
-
-    let labelNode = dot.querySelector('span');
-    if (!(labelNode instanceof HTMLElement)) {
-      labelNode = document.createElement('span');
-      dot.append(labelNode);
-    }
-    labelNode.textContent = buildDotLabelFromSection(section);
-    nextDots.push(dot);
-  }
-
-  dotsNav.replaceChildren(...nextDots);
-  dotsNav.style.setProperty('--dot-count', String(nextDots.length || 0));
-  return nextDots;
+  return Array.from(document.querySelectorAll('main .screen[id]'));
 }
 
 function isCompactViewport() {
@@ -1013,54 +778,31 @@ function attachSectionDepthEffect(sections) {
 }
 
 function getSectionCenterOffset(section) {
-  if (!(section instanceof HTMLElement)) {
-    return 0;
-  }
-
   return section.offsetTop + section.offsetHeight / 2;
 }
 
 function getCenteredScrollTop(section) {
-  if (!(section instanceof HTMLElement)) {
-    return 0;
+  if (isCompactViewport()) {
+    const topbar = document.getElementById('topbar');
+    const offset = (topbar?.offsetHeight || 64) + 10;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    return clamp(section.offsetTop - offset, 0, maxScroll);
   }
 
   const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-  if (isCompactViewport()) {
-    const target = section.offsetTop - getTopbarNavigationOffset();
-    return clamp(target, 0, maxScroll);
-  }
-
   const target = getSectionCenterOffset(section) - window.innerHeight / 2;
   return clamp(target, 0, maxScroll);
 }
 
 function scrollSectionToCenter(section, behavior = 'smooth') {
-  if (!(section instanceof HTMLElement)) {
+  if (!section) {
     return;
   }
 
   window.scrollTo({
     top: getCenteredScrollTop(section),
-    behavior,
-    left: 0
+    behavior
   });
-}
-
-function getTopbarNavigationOffset() {
-  const rootOffsetValue = Number.parseFloat(
-    window.getComputedStyle(document.documentElement).getPropertyValue('--snap-offset')
-  );
-  const rootOffset = Number.isFinite(rootOffsetValue) ? rootOffsetValue : 0;
-  const topbar = document.getElementById('topbar');
-  if (!(topbar instanceof HTMLElement)) {
-    return Math.max(rootOffset, 72);
-  }
-
-  const rect = topbar.getBoundingClientRect();
-  const topInset = Math.max(rect.top, 0);
-  const liveOffset = rect.height + topInset + 12;
-  return Math.max(rootOffset, liveOffset, 72);
 }
 
 function findNearestSectionIndex(sections) {
@@ -1068,15 +810,12 @@ function findNearestSectionIndex(sections) {
     return 0;
   }
 
-  const marker = isCompactViewport()
-    ? window.scrollY + getTopbarNavigationOffset()
-    : window.scrollY + window.innerHeight / 2;
+  const marker = window.scrollY + window.innerHeight / 2;
   let nearestIndex = 0;
   let smallestDistance = Number.POSITIVE_INFINITY;
 
   for (let index = 0; index < sections.length; index += 1) {
-    const sectionMarker = isCompactViewport() ? sections[index].offsetTop : getSectionCenterOffset(sections[index]);
-    const distance = Math.abs(sectionMarker - marker);
+    const distance = Math.abs(getSectionCenterOffset(sections[index]) - marker);
     if (distance >= smallestDistance) {
       continue;
     }
@@ -1126,19 +865,9 @@ function hasScrollableAncestor(target, deltaY) {
 
 function attachSectionNavigation() {
   const sections = getSlideSections();
-  const dotButtons = Array.from(document.querySelectorAll('.section-dot[data-target]')).filter(
-    (button) => button instanceof HTMLButtonElement
-  );
-  if (dotButtons.length === 0) {
-    dotButtons.push(...syncSectionDotsWithSections(sections));
-  }
+  const dotButtons = Array.from(document.querySelectorAll('.section-dot[data-target]'));
   const anchorLinks = Array.from(document.querySelectorAll('a[href^="#"]'));
   const progressBar = document.getElementById('scrollProgressBar');
-  const anime = getAnime();
-  const dotsNav = document.querySelector('.section-dots');
-  if (dotsNav instanceof HTMLElement) {
-    dotsNav.style.setProperty('--dot-count', String(dotButtons.length || 0));
-  }
   if (sections.length === 0) {
     return {
       sections,
@@ -1162,15 +891,6 @@ function attachSectionNavigation() {
       const isActive = button.dataset.target === activeSectionId;
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-current', isActive ? 'true' : 'false');
-      if (isActive && anime && !prefersReducedMotion()) {
-        anime.remove(button);
-        anime({
-          targets: button,
-          scale: [1, 1.16, 1.08],
-          duration: 280,
-          easing: EASE_POP
-        });
-      }
     }
 
     if (progressBar) {
@@ -1283,11 +1003,6 @@ function attachSegmentScroll(sectionController) {
     return;
   }
 
-  const snapType = (window.getComputedStyle(document.documentElement).scrollSnapType || '').toLowerCase();
-  if (snapType.includes('x') || snapType.includes('y')) {
-    return;
-  }
-
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const coarsePointer = window.matchMedia('(pointer: coarse)');
   if (reducedMotion.matches || coarsePointer.matches || isCompactViewport()) {
@@ -1348,15 +1063,8 @@ function attachSegmentScroll(sectionController) {
       return;
     }
 
-    const direction = accumulatedDelta > 0 ? 1 : -1;
-    const currentIndex = findNearestSectionIndex(sections);
-    const nextIndex = clamp(currentIndex + direction, 0, sections.length - 1);
-    if (nextIndex === currentIndex) {
-      accumulatedDelta = 0;
-      return;
-    }
-
     event.preventDefault();
+    const direction = accumulatedDelta > 0 ? 1 : -1;
     accumulatedDelta = 0;
     scrollByDirection(direction);
   };
@@ -1378,12 +1086,6 @@ function attachSegmentScroll(sectionController) {
     }
 
     if (direction === 0) {
-      return;
-    }
-
-    const currentIndex = findNearestSectionIndex(sections);
-    const nextIndex = clamp(currentIndex + direction, 0, sections.length - 1);
-    if (nextIndex === currentIndex) {
       return;
     }
 
@@ -1438,23 +1140,6 @@ function attachInteractivePreview() {
 
   const selectHasOption = (selectNode, value) =>
     Array.from(selectNode.options).some((optionNode) => optionNode.value === value);
-
-  const setAnimatedText = (node, value) => {
-    if (!(node instanceof HTMLElement)) {
-      return;
-    }
-
-    const nextText = String(value);
-    const previousText = node.textContent ?? '';
-    node.textContent = nextText;
-    if (previousText !== nextText) {
-      animateNode(node, {
-        scale: [1, 1.06, 1],
-        duration: 210,
-        easing: EASE_GENTLE
-      });
-    }
-  };
 
   const setActivePhrase = (sentence) => {
     const normalized = sanitizeSentence(sentence).toLowerCase();
@@ -1550,27 +1235,27 @@ function attachInteractivePreview() {
       }
 
       if (previewDensityNode) {
-        setAnimatedText(previewDensityNode, '0%');
+        previewDensityNode.textContent = '0%';
       }
 
       if (previewWordCountNode) {
-        setAnimatedText(previewWordCountNode, String(sentence.split(/\s+/).filter(Boolean).length));
+        previewWordCountNode.textContent = String(sentence.split(/\s+/).filter(Boolean).length);
       }
 
       if (previewStatusNode) {
-        setAnimatedText(previewStatusNode, 'Paused');
+        previewStatusNode.textContent = 'Paused';
       }
 
-      setAnimatedText(previewMeta, 'Lingo Stream disabled - captions stay original.');
+      previewMeta.textContent = 'Lingo Stream disabled - captions stay original.';
       setActivePhrase(sentence);
       return;
     }
 
     const requestId = ++previewRequestId;
     if (previewStatusNode) {
-      setAnimatedText(previewStatusNode, 'Translating...');
+      previewStatusNode.textContent = 'Translating...';
     }
-    setAnimatedText(previewMeta, `Provider: ${providerLabel} - Target: ${languageLabel} - Translating...`);
+    previewMeta.textContent = `Provider: ${providerLabel} - Target: ${languageLabel} - Translating...`;
 
     const translated = await buildTranslatedLine(
       sentence,
@@ -1595,31 +1280,28 @@ function attachInteractivePreview() {
         translated.candidateCount > 0
           ? Math.round((translated.replacedCount / translated.candidateCount) * 100)
           : 0;
-      setAnimatedText(previewDensityNode, `${density}%`);
+      previewDensityNode.textContent = `${density}%`;
     }
 
     if (previewWordCountNode) {
-      setAnimatedText(previewWordCountNode, String(translated.totalWords));
+      previewWordCountNode.textContent = String(translated.totalWords);
     }
 
     const usedProviders = summarizeUsedProviders(translated.providerByWord);
     const failedWords = Object.keys(translated.failedProvidersByWord).length;
     if (previewStatusNode) {
       if (translated.replacedCount > 0 && failedWords === 0) {
-        setAnimatedText(previewStatusNode, 'Active');
+        previewStatusNode.textContent = 'Active';
       } else if (translated.replacedCount > 0) {
-        setAnimatedText(previewStatusNode, 'Partial');
+        previewStatusNode.textContent = 'Partial';
       } else {
-        setAnimatedText(previewStatusNode, 'No matches');
+        previewStatusNode.textContent = 'No matches';
       }
     }
 
     const autoProviderInfo = providerValue === 'auto' && usedProviders ? ` (${usedProviders})` : '';
     const missInfo = failedWords > 0 ? ` - API misses: ${failedWords}` : '';
-    setAnimatedText(
-      previewMeta,
-      `Provider: ${providerLabel}${autoProviderInfo} - Target: ${languageLabel} - Replaced words: ${translated.replacedCount}${missInfo}`
-    );
+    previewMeta.textContent = `Provider: ${providerLabel}${autoProviderInfo} - Target: ${languageLabel} - Replaced words: ${translated.replacedCount}${missInfo}`;
     setActivePhrase(sentence);
   };
 
@@ -1662,12 +1344,9 @@ function attachInteractivePreview() {
   if (saveButton) {
     saveButton.addEventListener('click', () => {
       const saved = persistSettings();
-      setAnimatedText(
-        previewMeta,
-        saved
+      previewMeta.textContent = saved
         ? 'Settings saved locally for this preview.'
-        : 'Unable to store settings in this browser context.'
-      );
+        : 'Unable to store settings in this browser context.';
     });
   }
 
@@ -1691,7 +1370,6 @@ function attachQuizShowcase() {
   }
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const anime = getAnime();
   if (reducedMotion.matches) {
     return;
   }
@@ -1723,16 +1401,6 @@ function attachQuizShowcase() {
     for (const card of current) {
       card.classList.add('is-demo-match');
     }
-    if (anime) {
-      anime.remove(current);
-      anime({
-        targets: current,
-        scale: [1, 1.05, 1],
-        translateY: [0, -2, 0],
-        duration: 320,
-        easing: EASE_GENTLE
-      });
-    }
     cursor = (cursor + 1) % pairs.length;
   };
 
@@ -1747,77 +1415,18 @@ function updateCopyrightYear() {
   }
 }
 
-function attachSiteEntranceMotion() {
-  const anime = getAnime();
-  if (!anime || prefersReducedMotion()) {
-    return;
-  }
-
-  const topbar = document.getElementById('topbar');
-  const dots = Array.from(document.querySelectorAll('.section-dot'));
-  const heroCopy = document.querySelector('.hero-copy');
-  const heroVisual = document.querySelector('.hero-visual');
-
-  if (topbar) {
-    anime({
-      targets: topbar,
-      opacity: [0, 1],
-      translateY: [-12, 0],
-      duration: 460,
-      easing: EASE_STANDARD
-    });
-  }
-
-  if (dots.length > 0) {
-    anime({
-      targets: dots,
-      opacity: [0, 1],
-      translateX: [12, 0],
-      delay: anime.stagger(40),
-      duration: 320,
-      easing: EASE_STANDARD
-    });
-  }
-
-  animateNode([heroCopy, heroVisual].filter(Boolean), {
-    opacity: [0, 1],
-    translateY: [14, 0],
-    delay: anime.stagger(90),
-    duration: 520,
-    easing: EASE_STANDARD
-  });
-
-  const textNodes = [
-    document.querySelector('.hero-copy h1'),
-    document.querySelector('#features h2'),
-    document.querySelector('#preview h2'),
-    document.querySelector('#quiz h2'),
-    document.querySelector('#install h2')
-  ];
-
-  for (const [index, node] of textNodes.entries()) {
-    window.setTimeout(() => {
-      animateTextSplit(node, {
-        duration: 620,
-        stagger: 12,
-        ease: EASE_STANDARD
-      });
-    }, 120 + index * 80);
-  }
-}
-
 function initializeSite() {
   const repositoryUrl = inferRepositoryUrl();
   attachCurrentReleaseInfo();
   attachRepositoryLinks(repositoryUrl);
   attachReleaseLinks(repositoryUrl);
-  attachSiteEntranceMotion();
   attachRevealAnimation();
   attachTopbarContraction();
   attachFloatingPlusField();
   attachBackgroundParallax();
   const sectionController = attachSectionNavigation();
   attachSectionDepthEffect(sectionController.sections);
+  attachSegmentScroll(sectionController);
   attachInteractivePreview();
   attachQuizShowcase();
   updateCopyrightYear();
