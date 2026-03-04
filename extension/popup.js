@@ -68,11 +68,146 @@ let currentQuizBuckets = {
   incorrect: []
 };
 
+function getAnime() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return typeof window.anime === 'function' ? window.anime : null;
+}
+
+function prefersReducedMotion() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function animateNode(node, config) {
+  if (!(node instanceof HTMLElement) || prefersReducedMotion()) {
+    return;
+  }
+
+  const anime = getAnime();
+  if (!anime) {
+    return;
+  }
+
+  anime.remove(node);
+  anime({
+    targets: node,
+    ...config
+  });
+}
+
+function setTextWithPulse(node, value) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+
+  const nextText = String(value);
+  const previousText = node.textContent ?? '';
+  node.textContent = nextText;
+
+  if (previousText !== nextText) {
+    animateNode(node, {
+      scale: [1, 1.08, 1],
+      duration: 260,
+      easing: 'easeOutQuad'
+    });
+  }
+}
+
+function getButtonLabel(button, fallback = '') {
+  if (!(button instanceof HTMLButtonElement)) {
+    return fallback;
+  }
+
+  const textNode = button.querySelector('.btn-text');
+  if (textNode) {
+    return textNode.textContent ?? fallback;
+  }
+
+  return button.textContent ?? fallback;
+}
+
+function setButtonLabel(button, value) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const textNode = button.querySelector('.btn-text');
+  if (textNode) {
+    textNode.textContent = value;
+    return;
+  }
+
+  button.textContent = value;
+}
+
+function attachPopupRevealAnimation() {
+  const revealNodes = Array.from(document.querySelectorAll('[data-reveal]'));
+  if (revealNodes.length === 0) {
+    return;
+  }
+
+  const anime = getAnime();
+  if (!anime || prefersReducedMotion()) {
+    for (const node of revealNodes) {
+      node.classList.add('is-visible');
+    }
+    return;
+  }
+
+  anime({
+    targets: revealNodes,
+    opacity: [0, 1],
+    translateY: [10, 0],
+    scale: [0.99, 1],
+    delay: (_target, index) => {
+      const node = revealNodes[index];
+      const explicitDelay = Number.parseInt(node?.dataset.delay ?? '0', 10);
+      return Number.isFinite(explicitDelay) ? explicitDelay : index * 55;
+    },
+    duration: 360,
+    easing: 'easeOutExpo',
+    begin: () => {
+      for (const node of revealNodes) {
+        node.classList.add('is-visible');
+      }
+    }
+  });
+}
+
+function attachButtonPressAnimation() {
+  const anime = getAnime();
+  if (!anime || prefersReducedMotion()) {
+    return;
+  }
+
+  const buttons = Array.from(document.querySelectorAll('button'));
+  for (const button of buttons) {
+    button.addEventListener('click', () => {
+      animateNode(button, {
+        scale: [1, 0.97, 1],
+        duration: 180,
+        easing: 'easeOutQuad'
+      });
+    });
+  }
+}
+
 function updateReplacementLabel(value) {
-  replacementPercentageValue.textContent = `${value}%`;
+  setTextWithPulse(replacementPercentageValue, `${value}%`);
 }
 
 function setStatusElement(element, message, tone = 'neutral') {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+
+  const previousMessage = element.textContent ?? '';
   element.textContent = message;
   element.classList.remove('ok', 'error');
 
@@ -80,6 +215,15 @@ function setStatusElement(element, message, tone = 'neutral') {
     element.classList.add('ok');
   } else if (tone === 'error') {
     element.classList.add('error');
+  }
+
+  if (message && message !== previousMessage) {
+    animateNode(element, {
+      opacity: [0.2, 1],
+      translateY: [4, 0],
+      duration: 220,
+      easing: 'easeOutQuad'
+    });
   }
 }
 
@@ -486,13 +630,13 @@ function renderVocabularyBadges(entries, filteredEntries) {
   }
 
   if (vocabularyTotalBadge) {
-    vocabularyTotalBadge.textContent = String(totalCount);
+    setTextWithPulse(vocabularyTotalBadge, totalCount);
   }
   if (vocabularyFilteredBadge) {
-    vocabularyFilteredBadge.textContent = String(filteredCount);
+    setTextWithPulse(vocabularyFilteredBadge, filteredCount);
   }
   if (vocabularyProviderBadge) {
-    vocabularyProviderBadge.textContent = String(providerSet.size);
+    setTextWithPulse(vocabularyProviderBadge, providerSet.size);
   }
 }
 
@@ -678,6 +822,19 @@ function renderVocabularyList(entries) {
   vocabularyTableBody.textContent = '';
   for (const entry of filtered) {
     vocabularyTableBody.appendChild(createVocabularyRow(entry));
+  }
+
+  const anime = getAnime();
+  if (anime && !prefersReducedMotion() && filtered.length > 0) {
+    anime.remove(vocabularyTableBody.children);
+    anime({
+      targets: vocabularyTableBody.children,
+      opacity: [0, 1],
+      translateY: [6, 0],
+      delay: anime.stagger(18),
+      duration: 210,
+      easing: 'easeOutQuad'
+    });
   }
 
   renderVocabularyBadges(entries, filtered);
@@ -1052,10 +1209,10 @@ async function importVocabularyFromFile(file) {
     return;
   }
 
-  const originalImportLabel = importVocabularyButton?.textContent ?? 'Import CSV/JSON';
+  const originalImportLabel = getButtonLabel(importVocabularyButton, 'Import');
   if (importVocabularyButton) {
     importVocabularyButton.disabled = true;
-    importVocabularyButton.textContent = 'Importing...';
+    setButtonLabel(importVocabularyButton, 'Importing...');
   }
   showVocabularyActionStatus('Reading import file...');
 
@@ -1070,7 +1227,7 @@ async function importVocabularyFromFile(file) {
     showVocabularyActionStatus(`Import failed: ${error instanceof Error ? error.message : 'invalid file format'}`, 'error');
     if (importVocabularyButton) {
       importVocabularyButton.disabled = false;
-      importVocabularyButton.textContent = originalImportLabel;
+      setButtonLabel(importVocabularyButton, originalImportLabel);
     }
     return;
   }
@@ -1079,7 +1236,7 @@ async function importVocabularyFromFile(file) {
     showVocabularyActionStatus('Import failed: no valid vocabulary entries found.', 'error');
     if (importVocabularyButton) {
       importVocabularyButton.disabled = false;
-      importVocabularyButton.textContent = originalImportLabel;
+      setButtonLabel(importVocabularyButton, originalImportLabel);
     }
     return;
   }
@@ -1106,7 +1263,7 @@ async function importVocabularyFromFile(file) {
     showVocabularyActionStatus('Unable to store imported vocabulary.', 'error');
     if (importVocabularyButton) {
       importVocabularyButton.disabled = false;
-      importVocabularyButton.textContent = originalImportLabel;
+      setButtonLabel(importVocabularyButton, originalImportLabel);
     }
     return;
   }
@@ -1115,7 +1272,7 @@ async function importVocabularyFromFile(file) {
   showVocabularyActionStatus(`Imported ${importedEntries.length} entries from ${file.name}.`, 'ok');
   if (importVocabularyButton) {
     importVocabularyButton.disabled = false;
-    importVocabularyButton.textContent = originalImportLabel;
+    setButtonLabel(importVocabularyButton, originalImportLabel);
   }
 }
 
@@ -1176,9 +1333,9 @@ async function refreshActiveCaptions() {
 }
 
 async function exportVocabulary() {
-  const originalExportLabel = exportVocabularyButton.textContent;
+  const originalExportLabel = getButtonLabel(exportVocabularyButton, 'Export');
   exportVocabularyButton.disabled = true;
-  exportVocabularyButton.textContent = 'Exporting...';
+  setButtonLabel(exportVocabularyButton, 'Exporting...');
   showVocabularyActionStatus('Preparing vocabulary export...');
 
   const items = await getLocalStorage([LOCAL_STORAGE_KEYS.vocabularyEntries]);
@@ -1186,7 +1343,7 @@ async function exportVocabulary() {
 
   if (entries.length === 0) {
     showVocabularyActionStatus('No saved vocabulary to export.', 'error');
-    exportVocabularyButton.textContent = originalExportLabel;
+    setButtonLabel(exportVocabularyButton, originalExportLabel);
     exportVocabularyButton.disabled = true;
     return;
   }
@@ -1201,20 +1358,20 @@ async function exportVocabulary() {
 
   if (!downloaded) {
     showVocabularyActionStatus('Export failed. Please try again.', 'error');
-    exportVocabularyButton.textContent = originalExportLabel;
+    setButtonLabel(exportVocabularyButton, originalExportLabel);
     exportVocabularyButton.disabled = false;
     return;
   }
 
   showVocabularyActionStatus(`Export complete: ${entries.length} entries exported.`, 'ok');
-  exportVocabularyButton.textContent = originalExportLabel;
+  setButtonLabel(exportVocabularyButton, originalExportLabel);
   exportVocabularyButton.disabled = false;
 }
 
 async function clearVocabulary() {
-  const originalClearLabel = clearVocabularyButton.textContent;
+  const originalClearLabel = getButtonLabel(clearVocabularyButton, 'Reset');
   clearVocabularyButton.disabled = true;
-  clearVocabularyButton.textContent = 'Clearing...';
+  setButtonLabel(clearVocabularyButton, 'Clearing...');
 
   const success = await setLocalStorage({
     [LOCAL_STORAGE_KEYS.vocabularyEntries]: [],
@@ -1226,7 +1383,7 @@ async function clearVocabulary() {
   });
   if (!success) {
     showVocabularyActionStatus('Unable to clear saved vocabulary.', 'error');
-    clearVocabularyButton.textContent = originalClearLabel;
+    setButtonLabel(clearVocabularyButton, originalClearLabel);
     clearVocabularyButton.disabled = false;
     return;
   }
@@ -1237,7 +1394,7 @@ async function clearVocabulary() {
     incorrect: []
   });
   showVocabularyActionStatus('Cleared all saved vocabulary.', 'ok');
-  clearVocabularyButton.textContent = originalClearLabel;
+  setButtonLabel(clearVocabularyButton, originalClearLabel);
   clearVocabularyButton.disabled = true;
 }
 
@@ -1338,12 +1495,12 @@ function loadDebugSettings() {
 function saveSettings() {
   const settings = readFormSettings();
   saveButton.disabled = true;
-  const originalLabel = saveButton.textContent;
-  saveButton.textContent = 'Saving...';
+  const originalLabel = getButtonLabel(saveButton, 'Save');
+  setButtonLabel(saveButton, 'Saving...');
 
   chrome.storage.sync.set(settings, () => {
     saveButton.disabled = false;
-    saveButton.textContent = originalLabel;
+    setButtonLabel(saveButton, originalLabel);
 
     if (chrome.runtime.lastError) {
       console.error('Failed to save extension settings.', chrome.runtime.lastError);
@@ -1452,6 +1609,8 @@ chrome.storage.onChanged?.addListener((changes, areaName) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  attachPopupRevealAnimation();
+  attachButtonPressAnimation();
   loadSettings();
   loadDebugSettings();
   startLogPolling();

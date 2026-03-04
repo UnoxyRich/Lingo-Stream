@@ -29,13 +29,17 @@
         color: var(--text);
         font-family: "Manrope", "Avenir Next", "Trebuchet MS", sans-serif;
         background:
+          linear-gradient(160deg, #f6fff7 0%, #f2fbf3 46%, #ebf7ed 100%),
           radial-gradient(circle at 9% 5%, rgba(62, 155, 95, 0.2), transparent 40%),
           radial-gradient(circle at 96% 0%, rgba(43, 125, 69, 0.18), transparent 42%),
           var(--bg);
+        overflow: hidden;
       }
 
       main {
         padding: 10px;
+        display: grid;
+        gap: 8px;
       }
 
       .top-card {
@@ -160,6 +164,9 @@
       label {
         font-size: 11px;
         font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
       }
 
       select,
@@ -263,6 +270,10 @@
         letter-spacing: 0.01em;
         cursor: pointer;
         transition: transform 130ms ease, filter 130ms ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
       }
 
       button:hover {
@@ -317,6 +328,9 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
 
       .health-line {
@@ -465,6 +479,9 @@
         font-size: 11px;
         font-weight: 800;
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
 
       .debug-content {
@@ -502,6 +519,27 @@
         display: none;
       }
 
+      .icon-inline {
+        width: 13px;
+        height: 13px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: 0 0 auto;
+      }
+
+      [data-reveal] {
+        opacity: 0;
+        transform: translateY(10px) scale(0.99);
+      }
+
+      [data-reveal].is-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
       @media (max-width: 420px) {
         body {
           width: 100%;
@@ -520,36 +558,52 @@
   </head>
   <body>
     <main>
-      <header class="top-card">
+      <header class="top-card" data-reveal>
         <div class="brand">
           <img class="brand-logo" src="logo.svg" alt="Lingo Stream logo" />
           <div>
             <p class="eyebrow">Chrome Extension</p>
             <h1 class="hero-title">Lingo Stream</h1>
-            <p class="hero-subtitle">Blend translated words into live captions.</p>
+            <p class="hero-subtitle">Live subtitle mixing.</p>
           </div>
         </div>
         <div class="header-actions">
           <span class="live-pill">Live</span>
-          <button id="quizButton" type="button" aria-label="Open quiz in a new tab">Quiz</button>
+          <button id="quizButton" type="button" aria-label="Open quiz in a new tab">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 9a3 3 0 1 1 3 3v2M12 17h.01" />
+              <path d="M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0Z" />
+            </svg>
+            <span class="btn-text">Quiz</span>
+          </button>
         </div>
       </header>
 
-      <section class="panel">
+      <section class="panel" data-reveal data-delay="70">
         <div class="field span-2">
-          <label for="translationProvider">Translation provider</label>
+          <label for="translationProvider">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 5h18M8 3v4M13 5a7 7 0 0 1-7 7M9 8a11 11 0 0 0 7 7M17 13l3 8M14 21h6" />
+            </svg>
+            <span>Provider</span>
+          </label>
           <select id="translationProvider" name="translationProvider">
-            <option value="auto">Auto fallback (Recommended)</option>
-            <option value="google">Google translate endpoint</option>
-            <option value="libre">LibreTranslate public mirrors</option>
-            <option value="apertium">Apertium APY</option>
+            <option value="auto">Auto (Recommended)</option>
+            <option value="google">Google</option>
+            <option value="libre">LibreTranslate</option>
+            <option value="apertium">Apertium</option>
             <option value="mymemory">MyMemory</option>
           </select>
-          <p class="hint">Auto tries multiple free providers in order and uses the first successful translation.</p>
+          <p class="hint">Auto tries providers in order and uses the first success.</p>
         </div>
 
         <div class="field">
-          <label for="targetLanguage">Target language</label>
+          <label for="targetLanguage">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20M3 7h18M3 17h18" />
+            </svg>
+            <span>Language</span>
+          </label>
           <select id="targetLanguage" name="targetLanguage">
             <option value="es">Spanish</option>
             <option value="fr">French</option>
@@ -572,7 +626,13 @@
         </div>
 
         <div class="field">
-          <label for="replacementPercentage">Replacement percentage</label>
+          <label for="replacementPercentage">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 5 5 19M8 6h.01M16 18h.01" />
+              <path d="M7.5 6A1.5 1.5 0 1 1 6 7.5 1.5 1.5 0 0 1 7.5 6Zm9 9A1.5 1.5 0 1 1 15 16.5 1.5 1.5 0 0 1 16.5 15Z" />
+            </svg>
+            <span>Mix %</span>
+          </label>
           <div class="range-row">
             <input id="replacementPercentage" name="replacementPercentage" type="range" min="1" max="100" step="1" />
             <output id="replacementPercentageValue" for="replacementPercentage">5%</output>
@@ -580,26 +640,51 @@
         </div>
 
         <div class="field-inline switch-row">
-          <label for="enabled">Enable Lingo Stream</label>
+          <label for="enabled">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2v10M8 6a6 6 0 1 0 8 0" />
+            </svg>
+            <span>Enable</span>
+          </label>
           <input id="enabled" name="enabled" type="checkbox" />
         </div>
 
         <div class="field-inline switch-row">
-          <label for="saveVocabulary">Save translated vocabulary</label>
+          <label for="saveVocabulary">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 4h14v16H5zM9 4v6h6V4" />
+            </svg>
+            <span>Save Words</span>
+          </label>
           <input id="saveVocabulary" name="saveVocabulary" type="checkbox" />
         </div>
-        <p class="hint span-2">Store translated words locally so you can review and export them later.</p>
+        <p class="hint span-2">Store words locally for review and export.</p>
 
         <div class="button-row">
-          <button id="saveButton" type="button">Save Settings</button>
-          <button id="attachButton" type="button">Refresh Captions</button>
+          <button id="saveButton" type="button">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 4h14v16H5zM9 4v6h6V4" />
+            </svg>
+            <span class="btn-text">Save</span>
+          </button>
+          <button id="attachButton" type="button">
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v6h-6" />
+            </svg>
+            <span class="btn-text">Sync</span>
+          </button>
         </div>
 
         <p id="saveStatus" class="status" role="status" aria-live="polite"></p>
         <p id="runtimeStatus" class="status" role="status" aria-live="polite"></p>
 
         <details class="health-panel span-2" open>
-          <summary>Health Check</summary>
+          <summary>
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 3 7l9 4 9-4-9-4Zm-9 9 9 4 9-4M3 17l9 4 9-4" />
+            </svg>
+            <span>Health</span>
+          </summary>
           <p id="contentHealthStatus" class="status health-line" role="status" aria-live="polite">
             Content script: checking active tab...
           </p>
@@ -607,12 +692,22 @@
             Last translation success: none yet.
           </p>
           <div class="button-row">
-            <button id="recheckHealthButton" type="button">Recheck Health</button>
+            <button id="recheckHealthButton" type="button">
+              <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v6h-6" />
+              </svg>
+              <span class="btn-text">Recheck</span>
+            </button>
           </div>
         </details>
 
         <details class="health-panel span-2">
-          <summary>Vocabulary</summary>
+          <summary>
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5" />
+            </svg>
+            <span>Words</span>
+          </summary>
           <p id="vocabularyStatus" class="status health-line" role="status" aria-live="polite">Saved words: 0</p>
           <p id="quizBucketStatus" class="status health-line" role="status" aria-live="polite">
             Not quizzed: 0 | Correct: 0 | Incorrect: 0
@@ -635,12 +730,12 @@
             <input
               id="vocabularyFilterInput"
               type="search"
-              placeholder="Search source/translation"
+              placeholder="Search words"
               aria-label="Filter saved vocabulary"
             />
             <div class="vocabulary-filter-grid">
               <select id="vocabularyLanguageFilter" aria-label="Filter by language pair">
-                <option value="">All language pairs</option>
+                <option value="">All pairs</option>
               </select>
               <select id="vocabularyProviderFilter" aria-label="Filter by provider">
                 <option value="">All providers</option>
@@ -649,7 +744,12 @@
               <input id="vocabularyDateTo" type="date" aria-label="Filter to date" />
             </div>
             <div class="button-row">
-              <button id="vocabularyClearFiltersButton" type="button">Clear Filters</button>
+              <button id="vocabularyClearFiltersButton" type="button">
+                <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 6h18M8 6l1-2h6l1 2M6 6l1 14h10l1-14" />
+                </svg>
+                <span class="btn-text">Clear</span>
+              </button>
             </div>
           </div>
           <p id="vocabularyEmptyState" class="vocabulary-empty">No saved words yet.</p>
@@ -673,11 +773,26 @@
             aria-label="Import vocabulary file"
           />
           <div class="button-row">
-            <button id="importVocabularyButton" type="button">Import CSV/JSON</button>
-            <button id="exportVocabularyButton" type="button">Export Vocabulary</button>
+            <button id="importVocabularyButton" type="button">
+              <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+              </svg>
+              <span class="btn-text">Import</span>
+            </button>
+            <button id="exportVocabularyButton" type="button">
+              <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21V9M17 14l-5-5-5 5M4 3h16" />
+              </svg>
+              <span class="btn-text">Export</span>
+            </button>
           </div>
           <div class="button-row">
-            <button id="clearVocabularyButton" type="button">Clear Saved</button>
+            <button id="clearVocabularyButton" type="button">
+              <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 6h18M8 6l1-2h6l1 2M6 6l1 14h10l1-14" />
+              </svg>
+              <span class="btn-text">Reset</span>
+            </button>
           </div>
           <p
             id="vocabularyActionStatus"
@@ -688,19 +803,30 @@
         </details>
 
         <details class="span-2">
-          <summary>Debug Tools</summary>
+          <summary>
+            <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3h6l1 2h3v4l-2 2 2 2v4h-3l-1 2H9l-1-2H5v-4l2-2-2-2V5h3l1-2Zm3 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
+            </svg>
+            <span>Debug</span>
+          </summary>
           <div class="debug-content">
             <div class="debug-controls">
               <label for="debugEnabled">Enable debug mode</label>
               <input id="debugEnabled" name="debugEnabled" type="checkbox" />
             </div>
-            <button id="clearLogsButton" type="button">Clear Logs</button>
+            <button id="clearLogsButton" type="button">
+              <svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 6h18M8 6l1-2h6l1 2M6 6l1 14h10l1-14" />
+              </svg>
+              <span class="btn-text">Clear Logs</span>
+            </button>
             <div id="logPanel" aria-live="polite">Live logs appear here.</div>
           </div>
         </details>
       </section>
     </main>
 
+    <script src="vendor/anime.min.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

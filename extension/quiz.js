@@ -8,6 +8,11 @@ const INCORRECT_SELECTION_WEIGHT = 0.24;
 const WRONG_FLASH_MS = 340;
 const SCORE_PER_CORRECT = 12;
 const SCORE_PENALTY_PER_WRONG = 3;
+const QUIZ_INTRO_STORAGE_KEY = 'lingoStreamQuizIntroSeen';
+const EASE_STANDARD = 'cubicBezier(0.22, 1, 0.36, 1)';
+const EASE_GENTLE = 'cubicBezier(0.25, 0.46, 0.45, 0.94)';
+const EASE_POP = 'cubicBezier(0.34, 1.56, 0.64, 1)';
+const EASE_TEXT = 'cubicBezier(0.16, 1, 0.3, 1)';
 
 const state = {
   quizBuckets: {
@@ -26,6 +31,7 @@ const state = {
   correctMatches: 0,
   wrongMatches: 0,
   score: 0,
+  progressPercent: 0,
   wrongFlashTimer: null,
   roundPersisted: false
 };
@@ -35,25 +41,250 @@ const elements = {
   emptyState: null,
   sourceChoices: null,
   translationChoices: null,
-  statusLine: null,
-  instructionLine: null,
   progressLabel: null,
   progressFill: null,
-  selectedSourceValue: null,
-  selectedTranslationValue: null,
   roundValue: null,
+  correctCountValue: null,
+  incorrectCountValue: null,
   pairValue: null,
+  remainingCountValue: null,
+  wordPoolValue: null,
   accuracyValue: null,
   scoreValue: null,
-  notQuizzedValue: null,
-  answeredCorrectValue: null,
-  answeredIncorrectValue: null,
   nextRoundButton: null,
-  refreshButton: null
+  firstQuizModal: null,
+  startQuizButton: null
 };
+
+const activeTextSplitByNode = new WeakMap();
+const lastAnimatedTextByNode = new WeakMap();
+const choiceReflectionStateByNode = new WeakMap();
+const CHOICE_REFLECTION_EASE = 0.22;
+const CHOICE_REFLECTION_SETTLE_DELTA = 0.16;
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function prefersReducedMotion() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function getAnime() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return typeof window.anime === 'function' ? window.anime : null;
+}
+
+function getAnimeText() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const animeTextApi = window.anime4;
+  if (!animeTextApi || typeof animeTextApi.animate !== 'function' || typeof animeTextApi.splitText !== 'function') {
+    return null;
+  }
+
+  return animeTextApi;
+}
+
+function pulseNode(node, options = {}) {
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
+
+  const anime = getAnime();
+  if (!anime || prefersReducedMotion()) {
+    return;
+  }
+
+  anime.remove(node);
+  anime({
+    targets: node,
+    ...options
+  });
+}
+
+function animateTextChange(node, options = {}) {
+  if (!(node instanceof HTMLElement) || prefersReducedMotion()) {
+    return;
+  }
+
+  const currentText = node.textContent ?? '';
+  const forceAnimation = options.force === true;
+  if (!forceAnimation && lastAnimatedTextByNode.get(node) === currentText) {
+    return;
+  }
+
+  lastAnimatedTextByNode.set(node, currentText);
+
+  const animeText = getAnimeText();
+  if (!animeText) {
+    return;
+  }
+
+  const previousSplit = activeTextSplitByNode.get(node);
+  if (previousSplit && typeof previousSplit.revert === 'function') {
+    previousSplit.revert();
+  }
+
+  const split = animeText.splitText(node, { chars: true, words: false });
+  const chars = Array.isArray(split?.chars) ? split.chars : [];
+  if (chars.length === 0) {
+    return;
+  }
+
+  activeTextSplitByNode.set(node, split);
+  animeText.animate(chars, {
+    y: [options.fromY ?? '0.42em', '0em'],
+    opacity: [0, 1],
+    duration: options.duration ?? 360,
+    delay: animeText.stagger(options.stagger ?? 9),
+    ease: options.ease ?? EASE_TEXT,
+    onComplete: () => {
+      if (activeTextSplitByNode.get(node) === split) {
+        split.revert();
+        activeTextSplitByNode.delete(node);
+      }
+    }
+  });
+}
+
+function shouldAnimateChoiceReflection() {
+  if (prefersReducedMotion()) {
+    return false;
+  }
+
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return true;
+  }
+
+  return !window.matchMedia('(pointer: coarse)').matches;
+}
+
+function paintChoiceReflection(button, reflectionState) {
+  button.style.setProperty('--reflect-x', `${reflectionState.x.toFixed(2)}%`);
+  button.style.setProperty('--reflect-y', `${reflectionState.y.toFixed(2)}%`);
+}
+
+function getChoiceReflectionState(button) {
+  let reflectionState = choiceReflectionStateByNode.get(button);
+  if (reflectionState) {
+    return reflectionState;
+  }
+
+  reflectionState = {
+    x: 50,
+    y: 50,
+    targetX: 50,
+    targetY: 50,
+    active: false,
+    frameId: 0
+  };
+  choiceReflectionStateByNode.set(button, reflectionState);
+  paintChoiceReflection(button, reflectionState);
+  return reflectionState;
+}
+
+function setChoiceReflectionTarget(button, reflectionState, clientX, clientY) {
+  const rect = button.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+
+  reflectionState.targetX = clamp(((clientX - rect.left) / rect.width) * 100, 0, 100);
+  reflectionState.targetY = clamp(((clientY - rect.top) / rect.height) * 100, 0, 100);
+}
+
+function queueChoiceReflectionFrame(button, reflectionState) {
+  if (reflectionState.frameId) {
+    return;
+  }
+
+  reflectionState.frameId = window.requestAnimationFrame(() => {
+    reflectionState.frameId = 0;
+
+    reflectionState.x += (reflectionState.targetX - reflectionState.x) * CHOICE_REFLECTION_EASE;
+    reflectionState.y += (reflectionState.targetY - reflectionState.y) * CHOICE_REFLECTION_EASE;
+    paintChoiceReflection(button, reflectionState);
+
+    const settledX = Math.abs(reflectionState.targetX - reflectionState.x) <= CHOICE_REFLECTION_SETTLE_DELTA;
+    const settledY = Math.abs(reflectionState.targetY - reflectionState.y) <= CHOICE_REFLECTION_SETTLE_DELTA;
+    if (!reflectionState.active && settledX && settledY) {
+      reflectionState.x = reflectionState.targetX;
+      reflectionState.y = reflectionState.targetY;
+      paintChoiceReflection(button, reflectionState);
+      return;
+    }
+
+    queueChoiceReflectionFrame(button, reflectionState);
+  });
+}
+
+function handleChoicePointerEnter(event) {
+  if (!shouldAnimateChoiceReflection()) {
+    return;
+  }
+
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  const reflectionState = getChoiceReflectionState(button);
+  reflectionState.active = true;
+  button.style.setProperty('--reflect-opacity', '1');
+  setChoiceReflectionTarget(button, reflectionState, event.clientX, event.clientY);
+  queueChoiceReflectionFrame(button, reflectionState);
+}
+
+function handleChoicePointerMove(event) {
+  if (!shouldAnimateChoiceReflection()) {
+    return;
+  }
+
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  const reflectionState = getChoiceReflectionState(button);
+  reflectionState.active = true;
+  setChoiceReflectionTarget(button, reflectionState, event.clientX, event.clientY);
+  queueChoiceReflectionFrame(button, reflectionState);
+}
+
+function handleChoicePointerLeave(event) {
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  const reflectionState = getChoiceReflectionState(button);
+  reflectionState.active = false;
+  reflectionState.targetX = 50;
+  reflectionState.targetY = 50;
+  button.style.setProperty('--reflect-opacity', '0');
+  queueChoiceReflectionFrame(button, reflectionState);
+}
+
+function cleanupChoiceReflection(button) {
+  const reflectionState = choiceReflectionStateByNode.get(button);
+  if (!reflectionState) {
+    return;
+  }
+
+  if (reflectionState.frameId) {
+    window.cancelAnimationFrame(reflectionState.frameId);
+  }
+  choiceReflectionStateByNode.delete(button);
 }
 
 function parseTimestampCandidate(value) {
@@ -467,21 +698,19 @@ function cacheElements() {
   elements.emptyState = document.getElementById('emptyState');
   elements.sourceChoices = document.getElementById('sourceChoices');
   elements.translationChoices = document.getElementById('translationChoices');
-  elements.statusLine = document.getElementById('statusLine');
-  elements.instructionLine = document.getElementById('instructionLine');
   elements.progressLabel = document.getElementById('progressLabel');
   elements.progressFill = document.getElementById('progressFill');
-  elements.selectedSourceValue = document.getElementById('selectedSourceValue');
-  elements.selectedTranslationValue = document.getElementById('selectedTranslationValue');
   elements.roundValue = document.getElementById('roundValue');
+  elements.correctCountValue = document.getElementById('correctCountValue');
+  elements.incorrectCountValue = document.getElementById('incorrectCountValue');
   elements.pairValue = document.getElementById('pairValue');
+  elements.remainingCountValue = document.getElementById('remainingCountValue');
+  elements.wordPoolValue = document.getElementById('wordPoolValue');
   elements.accuracyValue = document.getElementById('accuracyValue');
   elements.scoreValue = document.getElementById('scoreValue');
-  elements.notQuizzedValue = document.getElementById('notQuizzedValue');
-  elements.answeredCorrectValue = document.getElementById('answeredCorrectValue');
-  elements.answeredIncorrectValue = document.getElementById('answeredIncorrectValue');
   elements.nextRoundButton = document.getElementById('nextRoundButton');
-  elements.refreshButton = document.getElementById('refreshButton');
+  elements.firstQuizModal = document.getElementById('firstQuizModal');
+  elements.startQuizButton = document.getElementById('startQuizButton');
 }
 
 function attachRevealAnimation() {
@@ -489,6 +718,8 @@ function attachRevealAnimation() {
   if (revealNodes.length === 0) {
     return;
   }
+
+  const anime = getAnime();
 
   const observer = new IntersectionObserver(
     (entries) => {
@@ -498,8 +729,21 @@ function attachRevealAnimation() {
         }
 
         const delayMs = Number.parseInt(entry.target.dataset.delay || '0', 10);
-        entry.target.style.transitionDelay = `${Math.max(0, delayMs)}ms`;
         entry.target.classList.add('visible');
+        if (anime && !prefersReducedMotion()) {
+          anime.remove(entry.target);
+          anime({
+            targets: entry.target,
+            opacity: [0, 1],
+            translateY: [18, 0],
+            scale: [0.985, 1],
+            duration: 560,
+            delay: Math.max(0, delayMs),
+            easing: EASE_STANDARD
+          });
+        } else {
+          entry.target.style.transitionDelay = `${Math.max(0, delayMs)}ms`;
+        }
         observer.unobserve(entry.target);
       }
     },
@@ -518,6 +762,7 @@ function attachFloatingPlusField() {
   }
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const anime = getAnime();
   const ornaments = [];
 
   const buildOrnaments = () => {
@@ -531,13 +776,26 @@ function attachFloatingPlusField() {
       node.style.left = `${Math.random() * 100}%`;
       node.style.top = `${Math.random() * 100}%`;
       node.style.setProperty('--size', `${12 + Math.random() * 22}px`);
-      node.style.setProperty('--alpha', (0.06 + Math.random() * 0.16).toFixed(3));
+      const baseAlpha = (0.06 + Math.random() * 0.16).toFixed(3);
+      node.style.setProperty('--alpha', baseAlpha);
       node.style.setProperty('--spin-duration', `${12 + Math.random() * 30}s`);
 
       const glyph = document.createElement('span');
       glyph.className = 'floating-plus-glyph';
       node.append(glyph);
       field.append(node);
+
+      if (anime && !reducedMotion.matches) {
+        anime({
+          targets: node,
+          opacity: [Number.parseFloat(baseAlpha), clamp(Number.parseFloat(baseAlpha) + 0.12, 0.04, 0.32)],
+          duration: 2200 + Math.random() * 1900,
+          easing: EASE_GENTLE,
+          direction: 'alternate',
+          loop: true,
+          delay: Math.random() * 1000
+        });
+      }
 
       ornaments.push({
         node,
@@ -615,6 +873,92 @@ function attachBackgroundParallax() {
   update();
 }
 
+function hasSeenQuizIntro() {
+  try {
+    return window.localStorage.getItem(QUIZ_INTRO_STORAGE_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markQuizIntroSeen() {
+  try {
+    window.localStorage.setItem(QUIZ_INTRO_STORAGE_KEY, '1');
+  } catch {
+    // Ignore localStorage write errors.
+  }
+}
+
+function showFirstQuizModalIfNeeded() {
+  if (!elements.firstQuizModal || hasSeenQuizIntro()) {
+    return;
+  }
+
+  elements.firstQuizModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+
+  const modalCard = elements.firstQuizModal.querySelector('.intro-card');
+  pulseNode(modalCard, {
+    opacity: [0.2, 1],
+    translateY: [24, 0],
+    scale: [0.95, 1],
+    duration: 480,
+    easing: EASE_STANDARD
+  });
+
+  animateTextChange(document.querySelector('.intro-kicker'), { duration: 420, stagger: 9 });
+  animateTextChange(document.getElementById('introTitle'), { duration: 560, stagger: 12 });
+}
+
+function closeFirstQuizModal() {
+  if (!elements.firstQuizModal || elements.firstQuizModal.classList.contains('hidden')) {
+    return;
+  }
+
+  markQuizIntroSeen();
+  const modal = elements.firstQuizModal;
+  const modalCard = modal.querySelector('.intro-card');
+  const anime = getAnime();
+
+  if (anime && !prefersReducedMotion() && modalCard) {
+    anime.remove(modalCard);
+    anime({
+      targets: modalCard,
+      opacity: [1, 0],
+      translateY: [0, -16],
+      scale: [1, 0.94],
+      duration: 280,
+      easing: EASE_GENTLE,
+      complete: () => {
+        modal.classList.add('hidden');
+        document.body.classList.remove('modal-open');
+      }
+    });
+    return;
+  }
+
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+function attachTextEntranceMotion() {
+  const animatedNodes = [
+    document.querySelector('.brand-name'),
+    document.querySelector('.panel-head h2'),
+    ...Array.from(document.querySelectorAll('.column-title'))
+  ];
+
+  for (const [index, node] of animatedNodes.entries()) {
+    window.setTimeout(() => {
+      animateTextChange(node, {
+        duration: 460,
+        stagger: 8,
+        ease: EASE_STANDARD
+      });
+    }, index * 60);
+  }
+}
+
 function getLocalStorage(keys) {
   return new Promise((resolve) => {
     chrome.storage.local.get(keys, (items) => {
@@ -654,30 +998,30 @@ function clearWrongFeedbackTimer() {
   }
 }
 
-function setStatus(message, tone = 'neutral') {
-  if (!elements.statusLine) {
-    return;
-  }
-
-  elements.statusLine.textContent = message;
-  elements.statusLine.classList.remove('good', 'warn');
-  if (tone === 'good') {
-    elements.statusLine.classList.add('good');
-  } else if (tone === 'warn') {
-    elements.statusLine.classList.add('warn');
+function updateBucketStats() {
+  if (elements.wordPoolValue) {
+    const poolSize = state.quizBuckets.notQuizzed.length + state.quizBuckets.incorrect.length;
+    setStatValue(elements.wordPoolValue, String(poolSize));
   }
 }
 
-function updateBucketStats() {
-  if (elements.notQuizzedValue) {
-    elements.notQuizzedValue.textContent = String(state.quizBuckets.notQuizzed.length);
+function setStatValue(node, value) {
+  if (!(node instanceof HTMLElement)) {
+    return;
   }
-  if (elements.answeredCorrectValue) {
-    elements.answeredCorrectValue.textContent = String(state.quizBuckets.correct.length);
+
+  const nextValue = String(value);
+  const previousValue = node.textContent ?? '';
+  node.textContent = nextValue;
+  if (previousValue === nextValue) {
+    return;
   }
-  if (elements.answeredIncorrectValue) {
-    elements.answeredIncorrectValue.textContent = String(state.quizBuckets.incorrect.length);
-  }
+
+  pulseNode(node, {
+    scale: [1, 1.06, 1],
+    duration: 260,
+    easing: EASE_POP
+  });
 }
 
 function updateStats() {
@@ -686,62 +1030,46 @@ function updateStats() {
   const attempts = state.correctMatches + state.wrongMatches;
   const accuracy = attempts > 0 ? Math.round((state.correctMatches / attempts) * 100) : 100;
   const progressPercent = totalPairs > 0 ? Math.round((matched / totalPairs) * 100) : 0;
+  const remaining = Math.max(0, totalPairs - matched);
+  const anime = getAnime();
 
-  elements.roundValue.textContent = String(Math.max(1, state.roundIndex));
-  elements.pairValue.textContent = `${matched}/${totalPairs}`;
-  elements.accuracyValue.textContent = `${accuracy}%`;
-  elements.scoreValue.textContent = String(state.score);
-  elements.progressLabel.textContent = `Matched ${matched} of ${totalPairs} pairs`;
-  elements.progressFill.style.width = `${progressPercent}%`;
+  setStatValue(elements.roundValue, String(Math.max(1, state.roundIndex)));
+  if (elements.correctCountValue) {
+    setStatValue(elements.correctCountValue, String(state.correctMatches));
+  }
+  if (elements.incorrectCountValue) {
+    setStatValue(elements.incorrectCountValue, String(state.wrongMatches));
+  }
+  setStatValue(elements.pairValue, `${matched}/${totalPairs}`);
+  if (elements.remainingCountValue) {
+    setStatValue(elements.remainingCountValue, String(remaining));
+  }
+  setStatValue(elements.accuracyValue, `${accuracy}%`);
+  setStatValue(elements.scoreValue, String(state.score));
+  const nextProgressLabel = `Matched ${matched} of ${totalPairs} pairs`;
+  const progressLabelChanged = elements.progressLabel.textContent !== nextProgressLabel;
+  elements.progressLabel.textContent = nextProgressLabel;
+  if (progressLabelChanged) {
+    animateTextChange(elements.progressLabel, {
+      force: true,
+      duration: 340,
+      stagger: 7,
+      ease: EASE_TEXT
+    });
+  }
+  if (anime && elements.progressFill && !prefersReducedMotion()) {
+    anime.remove(elements.progressFill);
+    anime({
+      targets: elements.progressFill,
+      width: [`${state.progressPercent}%`, `${progressPercent}%`],
+      duration: 320,
+      easing: EASE_STANDARD
+    });
+  } else if (elements.progressFill) {
+    elements.progressFill.style.width = `${progressPercent}%`;
+  }
+  state.progressPercent = progressPercent;
   updateBucketStats();
-}
-
-function updateInstructionLine() {
-  if (!elements.instructionLine) {
-    return;
-  }
-
-  const totalPairs = state.round?.pairs.length ?? 0;
-  const matched = state.matchedIds.size;
-  if (!state.round || totalPairs === 0) {
-    elements.instructionLine.textContent = '';
-    return;
-  }
-
-  if (matched >= totalPairs) {
-    elements.instructionLine.textContent = 'Round complete. Tap "Next 5 Words" to continue.';
-    return;
-  }
-
-  if (!state.selectedSourceId && !state.selectedTranslationId) {
-    elements.instructionLine.textContent = 'Step 1: Choose a source word.';
-    return;
-  }
-
-  if (state.selectedSourceId && !state.selectedTranslationId) {
-    elements.instructionLine.textContent = 'Step 2: Choose the matching translation.';
-    return;
-  }
-
-  if (!state.selectedSourceId && state.selectedTranslationId) {
-    elements.instructionLine.textContent = 'Step 1: Choose a source word first.';
-    return;
-  }
-
-  elements.instructionLine.textContent = 'Checking your match...';
-}
-
-function updateSelectionPreview() {
-  const sourceLabel = state.round?.pairById.get(state.selectedSourceId)?.source ?? '-';
-  const translationLabel = state.round?.pairById.get(state.selectedTranslationId)?.translation ?? '-';
-
-  if (elements.selectedSourceValue) {
-    elements.selectedSourceValue.textContent = `Source: ${sourceLabel}`;
-  }
-
-  if (elements.selectedTranslationValue) {
-    elements.selectedTranslationValue.textContent = `Translation: ${translationLabel}`;
-  }
 }
 
 function updateChoiceButtonState(button, kind, id) {
@@ -753,6 +1081,49 @@ function updateChoiceButtonState(button, kind, id) {
   button.classList.toggle('selected', !isMatched && isSelected);
   button.classList.toggle('wrong', !isMatched && isWrong);
   button.disabled = isMatched;
+
+  if (isMatched) {
+    const reflectionState = choiceReflectionStateByNode.get(button);
+    if (reflectionState) {
+      reflectionState.active = false;
+      reflectionState.targetX = 50;
+      reflectionState.targetY = 50;
+      queueChoiceReflectionFrame(button, reflectionState);
+    }
+    button.style.setProperty('--reflect-opacity', '0');
+  }
+}
+
+function animateChoicePair(pairId, mode) {
+  const anime = getAnime();
+  if (!anime || prefersReducedMotion()) {
+    return;
+  }
+
+  const targets = Array.from(document.querySelectorAll('.choice')).filter(
+    (node) => node instanceof HTMLElement && node.dataset.id === pairId
+  );
+  if (targets.length === 0) {
+    return;
+  }
+
+  anime.remove(targets);
+  if (mode === 'matched') {
+    anime({
+      targets,
+      scale: [1, 1.08, 1],
+      duration: 340,
+      easing: EASE_POP
+    });
+    return;
+  }
+
+  anime({
+    targets,
+    translateX: [0, -5, 5, -4, 4, 0],
+    duration: 280,
+    easing: EASE_GENTLE
+  });
 }
 
 function buildChoiceButton({ kind, id, label, index }) {
@@ -761,14 +1132,24 @@ function buildChoiceButton({ kind, id, label, index }) {
   button.className = 'choice';
   button.dataset.kind = kind;
   button.dataset.id = id;
-  button.textContent = label;
-  button.style.animationDelay = `${index * 34}ms`;
-  button.classList.add('choice-enter');
-  button.addEventListener('animationend', () => {
-    button.classList.remove('choice-enter');
-  }, { once: true });
+  button.style.setProperty('--reflect-x', '50%');
+  button.style.setProperty('--reflect-y', '50%');
+  button.style.setProperty('--reflect-opacity', '0');
+  const labelNode = document.createElement('span');
+  labelNode.className = 'choice-label';
+  labelNode.textContent = label;
+  button.append(labelNode);
+  button.dataset.enterIndex = String(index);
+
+  if (shouldAnimateChoiceReflection()) {
+    button.addEventListener('pointerenter', handleChoicePointerEnter);
+    button.addEventListener('pointermove', handleChoicePointerMove);
+    button.addEventListener('pointerleave', handleChoicePointerLeave);
+    button.addEventListener('pointercancel', handleChoicePointerLeave);
+  }
 
   updateChoiceButtonState(button, kind, id);
+
   return button;
 }
 
@@ -799,8 +1180,12 @@ function syncChoiceColumn(container, order, kind) {
     const existingButton = existingButtonsById.get(pair.id);
     if (existingButton) {
       existingButton.dataset.kind = kind;
-      existingButton.textContent = label;
-      existingButton.style.animationDelay = `${index * 34}ms`;
+      const existingLabelNode = existingButton.querySelector('.choice-label');
+      if (existingLabelNode) {
+        existingLabelNode.textContent = label;
+      } else {
+        existingButton.textContent = label;
+      }
       updateChoiceButtonState(existingButton, kind, pair.id);
       nextButtons.push(existingButton);
       existingButtonsById.delete(pair.id);
@@ -811,11 +1196,37 @@ function syncChoiceColumn(container, order, kind) {
   });
 
   for (const staleButton of existingButtonsById.values()) {
+    cleanupChoiceReflection(staleButton);
     staleButton.remove();
   }
 
   for (const button of nextButtons) {
     container.appendChild(button);
+    const enterIndex = Number.parseInt(button.dataset.enterIndex || '-1', 10);
+    if (!Number.isFinite(enterIndex) || enterIndex < 0) {
+      continue;
+    }
+
+    delete button.dataset.enterIndex;
+    const anime = getAnime();
+    if (anime && !prefersReducedMotion()) {
+      anime({
+        targets: button,
+        opacity: [0, 1],
+        translateY: [8, 0],
+        scale: [0.985, 1],
+        duration: 320,
+        delay: enterIndex * 28,
+        easing: EASE_STANDARD
+      });
+      continue;
+    }
+
+    button.style.animationDelay = `${enterIndex * 34}ms`;
+    button.classList.add('choice-enter');
+    button.addEventListener('animationend', () => {
+      button.classList.remove('choice-enter');
+    }, { once: true });
   }
 }
 
@@ -830,8 +1241,6 @@ function renderChoices() {
 
 function renderRound() {
   renderChoices();
-  updateInstructionLine();
-  updateSelectionPreview();
   updateStats();
 }
 
@@ -929,7 +1338,11 @@ async function persistRoundBucketOutcomes() {
 
 function onRoundCompleted() {
   elements.nextRoundButton.disabled = false;
-  setStatus(`Great run. You matched all ${PAIRS_PER_ROUND} words.`, 'good');
+  pulseNode(elements.nextRoundButton, {
+    scale: [1, 1.06, 1],
+    duration: 360,
+    easing: EASE_POP
+  });
   void persistRoundBucketOutcomes();
 }
 
@@ -950,12 +1363,11 @@ function evaluateCurrentSelection() {
       state.roundOutcomeById.set(sourceId, 'correct');
     }
 
-    const matchedCount = state.matchedIds.size;
     clearSelections();
     clearWrongFeedbackTimer();
     state.wrongSourceId = null;
     state.wrongTranslationId = null;
-    setStatus(`Correct. ${matchedCount}/${state.round.pairs.length} matched.`, 'good');
+    animateChoicePair(sourceId, 'matched');
 
     if (state.matchedIds.size === state.round.pairs.length) {
       onRoundCompleted();
@@ -971,7 +1383,8 @@ function evaluateCurrentSelection() {
   state.wrongTranslationId = translationId;
   markRoundOutcomeIncorrect(sourceId);
   markRoundOutcomeIncorrect(translationId);
-  setStatus('Not a match. Keep the source word selected and try another translation.', 'warn');
+  animateChoicePair(sourceId, 'wrong');
+  animateChoicePair(translationId, 'wrong');
   renderRound();
 
   clearWrongFeedbackTimer();
@@ -1009,8 +1422,6 @@ function handleChoiceClick(event) {
     state.selectedSourceId = state.selectedSourceId === id ? null : id;
   } else if (kind === 'translation') {
     if (!state.selectedSourceId) {
-      setStatus('Pick a source word first, then choose its translation.', 'warn');
-      updateInstructionLine();
       return;
     }
     state.selectedTranslationId = state.selectedTranslationId === id ? null : id;
@@ -1023,16 +1434,6 @@ function handleChoiceClick(event) {
 function showEmptyState(message) {
   elements.emptyState.classList.remove('hidden');
   elements.quizPanel.classList.add('hidden');
-  setStatus('', 'neutral');
-  if (elements.instructionLine) {
-    elements.instructionLine.textContent = '';
-  }
-  if (elements.selectedSourceValue) {
-    elements.selectedSourceValue.textContent = 'Source: -';
-  }
-  if (elements.selectedTranslationValue) {
-    elements.selectedTranslationValue.textContent = 'Translation: -';
-  }
 
   const paragraph = elements.emptyState.querySelector('p');
   if (paragraph) {
@@ -1049,7 +1450,7 @@ function buildAndStartRound() {
   const candidates = buildQuizCandidateEntries(state.quizBuckets);
   const round = buildMatchingRound(candidates);
   if (!round) {
-    showEmptyState(`You need at least ${PAIRS_PER_ROUND} words from Not Quizzed or Answered Incorrectly.`);
+    showEmptyState(`Need ${PAIRS_PER_ROUND}+ words in New or Retry.`);
     return false;
   }
 
@@ -1064,7 +1465,6 @@ function buildAndStartRound() {
   clearWrongFeedbackTimer();
   elements.nextRoundButton.disabled = true;
   showQuizPanel();
-  setStatus('Match all 5 words. Source first, translation second.', 'neutral');
   renderRound();
   return true;
 }
@@ -1082,27 +1482,24 @@ function resetScoreState() {
   state.correctMatches = 0;
   state.wrongMatches = 0;
   state.score = 0;
+  state.progressPercent = 0;
   clearWrongFeedbackTimer();
 }
 
 async function refreshWordsAndStart() {
-  elements.refreshButton.disabled = true;
   elements.nextRoundButton.disabled = true;
-  setStatus('Loading stored quiz words...', 'neutral');
 
   state.quizBuckets = await getQuizBucketsFromStorage();
   const started = buildAndStartRound();
   if (!started) {
     updateStats();
   }
-
-  elements.refreshButton.disabled = false;
 }
 
 function startNewRound() {
   const candidates = buildQuizCandidateEntries(state.quizBuckets);
   if (!Array.isArray(candidates) || candidates.length < MIN_PAIRS_PER_ROUND) {
-    showEmptyState(`You need at least ${PAIRS_PER_ROUND} words in Not Quizzed or Answered Incorrectly.`);
+    showEmptyState(`Need ${PAIRS_PER_ROUND}+ words in New or Retry.`);
     return;
   }
 
@@ -1113,9 +1510,18 @@ function attachEventHandlers() {
   elements.sourceChoices.addEventListener('click', handleChoiceClick);
   elements.translationChoices.addEventListener('click', handleChoiceClick);
   elements.nextRoundButton.addEventListener('click', startNewRound);
-  elements.refreshButton.addEventListener('click', () => {
-    resetScoreState();
-    void refreshWordsAndStart();
+  elements.startQuizButton?.addEventListener('click', closeFirstQuizModal);
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' && event.key !== 'Enter') {
+      return;
+    }
+
+    if (!elements.firstQuizModal || elements.firstQuizModal.classList.contains('hidden')) {
+      return;
+    }
+
+    event.preventDefault();
+    closeFirstQuizModal();
   });
 }
 
@@ -1124,10 +1530,12 @@ export async function initQuizPage() {
   attachRevealAnimation();
   attachFloatingPlusField();
   attachBackgroundParallax();
+  attachTextEntranceMotion();
   attachEventHandlers();
   resetScoreState();
   updateBucketStats();
   await refreshWordsAndStart();
+  showFirstQuizModalIfNeeded();
 }
 
 if (typeof document !== 'undefined') {

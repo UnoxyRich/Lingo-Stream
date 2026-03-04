@@ -25,98 +25,73 @@
     <header class="topbar">
       <a class="brand" href="#" aria-label="Lingo Stream quiz home">
         <img class="brand-logo" src="./logo.svg" alt="Lingo Stream logo" />
-        <span class="brand-name">Lingo Stream Quiz</span>
+        <span class="brand-name">Lingo Quiz</span>
       </a>
+      <div class="topbar-stats" aria-live="polite">
+        <article class="stat-chip">
+          <span>Round</span>
+          <strong id="roundValue">1</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Matched Pairs</span>
+          <strong id="pairValue">0/5</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Correct Matches</span>
+          <strong id="correctCountValue">0</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Incorrect Attempts</span>
+          <strong id="incorrectCountValue">0</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Words Remaining</span>
+          <strong id="remainingCountValue">0</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Accuracy</span>
+          <strong id="accuracyValue">100%</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Round Score</span>
+          <strong id="scoreValue">0</strong>
+        </article>
+        <article class="stat-chip">
+          <span>Word Pool</span>
+          <strong id="wordPoolValue">0</strong>
+        </article>
+      </div>
       <div class="topbar-actions">
-        <button id="refreshButton" class="btn btn-ghost" type="button">Refresh</button>
-        <button id="nextRoundButton" class="btn btn-primary" type="button" disabled>Next 5 Words</button>
+        <button id="nextRoundButton" class="btn btn-primary btn-icon" type="button" disabled aria-label="Next round">
+          <svg class="btn-svg" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
+          <span>Next Round</span>
+        </button>
       </div>
     </header>
 
     <main>
       <div class="quiz-shell">
-        <section class="hero-card" data-reveal>
-          <header>
-            <p class="eyebrow">Vocabulary Drill</p>
-            <h1>Match 5 Words</h1>
-            <p class="lead">Like Duolingo: pick one source word, then pick its translation.</p>
-          </header>
-
-          <div class="duo-steps">
-            <p><strong>Step 1</strong> Tap a source word.</p>
-            <p><strong>Step 2</strong> Tap the matching translation.</p>
-            <p><strong>Goal</strong> Clear all 5 pairs to finish the round.</p>
-          </div>
-
-          <div class="hero-kpis">
-            <article class="kpi">
-              <span>Round</span>
-              <strong id="roundValue">1</strong>
-            </article>
-            <article class="kpi">
-              <span>Score</span>
-              <strong id="scoreValue">0</strong>
-            </article>
-            <article class="kpi">
-              <span>Pairs</span>
-              <strong id="pairValue">0/0</strong>
-            </article>
-            <article class="kpi">
-              <span>Accuracy</span>
-              <strong id="accuracyValue">100%</strong>
-            </article>
-          </div>
-
-          <div class="bucket-kpis">
-            <article class="bucket-kpi">
-              <span>Not Quizzed</span>
-              <strong id="notQuizzedValue">0</strong>
-            </article>
-            <article class="bucket-kpi">
-              <span>Answered Correctly</span>
-              <strong id="answeredCorrectValue">0</strong>
-            </article>
-            <article class="bucket-kpi">
-              <span>Answered Incorrectly</span>
-              <strong id="answeredIncorrectValue">0</strong>
-            </article>
-          </div>
-
-          <p class="hero-note">
-            Quiz picks random words from <strong>Not Quizzed</strong> and a smaller share from
-            <strong>Answered Incorrectly</strong>. Words in <strong>Answered Correctly</strong> are skipped in future rounds.
-          </p>
-        </section>
-
-        <section id="quizPanel" class="quiz-panel hidden" data-reveal data-delay="90">
+        <section id="quizPanel" class="quiz-panel hidden" data-reveal data-delay="70">
           <div class="panel-head">
-            <h2>Round Board</h2>
+            <h2>Board</h2>
           </div>
 
           <div class="progress-wrap">
-            <p id="progressLabel" class="progress-label">Matched 0 of 0 pairs</p>
+            <p id="progressLabel" class="progress-label">Matched 0 of 5 pairs</p>
             <div class="progress-track">
               <div id="progressFill" class="progress-fill"></div>
             </div>
           </div>
 
-          <p id="instructionLine" class="instruction-line" aria-live="polite"></p>
-          <p id="statusLine" class="status-line" aria-live="polite"></p>
-          <div class="selection-tray" aria-live="polite">
-            <p class="selection-title">Current Picks</p>
-            <div class="selection-values">
-              <span id="selectedSourceValue" class="selection-pill">Source: -</span>
-              <span id="selectedTranslationValue" class="selection-pill">Translation: -</span>
-            </div>
-          </div>
-
           <div class="board">
             <section>
-              <p class="column-title">Step 1: Source Word</p>
+              <p class="column-title">A Source</p>
               <div id="sourceChoices" class="choices"></div>
             </section>
             <section>
-              <p class="column-title">Step 2: Translation</p>
+              <p class="column-title">B Match</p>
               <div id="translationChoices" class="choices"></div>
             </section>
           </div>
@@ -124,11 +99,26 @@
       </div>
 
       <section id="emptyState" class="empty-state hidden" data-reveal data-delay="140">
-        <h2>Not enough quiz words yet</h2>
-        <p>You need at least 5 words in Not Quizzed or Answered Incorrectly to start a round.</p>
+        <h2>Need more words</h2>
+        <p>Add at least 5 words in New or Retry.</p>
       </section>
     </main>
 
+    <div id="firstQuizModal" class="intro-modal hidden" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <div class="intro-card">
+        <p class="intro-kicker">First Quiz Session</p>
+        <h2 id="introTitle" class="intro-title">Match 5 words in one round.</h2>
+        <p class="intro-copy">
+          Select one source word and then its translation match. Finish all pairs to unlock the next round button.
+        </p>
+        <button id="startQuizButton" class="btn btn-primary intro-start-btn" type="button">
+          Start Quiz
+        </button>
+      </div>
+    </div>
+
+    <script src="./vendor/anime.min.js"></script>
+    <script src="./vendor/anime4.min.js"></script>
     <script type="module" src="./quiz.js"></script>
   </body>
 </html>

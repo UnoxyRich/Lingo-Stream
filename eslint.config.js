@@ -4,6 +4,9 @@ if (typeof globalThis.structuredClone !== 'function') {
 
 export default [
   {
+    ignores: ['extension/vendor/**', 'docs/vendor/**']
+  },
+  {
     files: ['**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
