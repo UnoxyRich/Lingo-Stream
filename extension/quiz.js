@@ -744,6 +744,17 @@ function updateSelectionPreview() {
   }
 }
 
+function updateChoiceButtonState(button, kind, id) {
+  const isMatched = state.matchedIds.has(id);
+  const isSelected = kind === 'source' ? state.selectedSourceId === id : state.selectedTranslationId === id;
+  const isWrong = kind === 'source' ? state.wrongSourceId === id : state.wrongTranslationId === id;
+
+  button.classList.toggle('matched', isMatched);
+  button.classList.toggle('selected', !isMatched && isSelected);
+  button.classList.toggle('wrong', !isMatched && isWrong);
+  button.disabled = isMatched;
+}
+
 function buildChoiceButton({ kind, id, label, index }) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -752,25 +763,60 @@ function buildChoiceButton({ kind, id, label, index }) {
   button.dataset.id = id;
   button.textContent = label;
   button.style.animationDelay = `${index * 34}ms`;
+  button.classList.add('choice-enter');
+  button.addEventListener('animationend', () => {
+    button.classList.remove('choice-enter');
+  }, { once: true });
 
-  const isMatched = state.matchedIds.has(id);
-  const isSelected = kind === 'source' ? state.selectedSourceId === id : state.selectedTranslationId === id;
-  const isWrong = kind === 'source' ? state.wrongSourceId === id : state.wrongTranslationId === id;
-
-  if (isMatched) {
-    button.classList.add('matched');
-    button.disabled = true;
-    return button;
-  }
-
-  if (isSelected) {
-    button.classList.add('selected');
-  }
-  if (isWrong) {
-    button.classList.add('wrong');
-  }
-
+  updateChoiceButtonState(button, kind, id);
   return button;
+}
+
+function syncChoiceColumn(container, order, kind) {
+  if (!state.round || !(container instanceof HTMLElement)) {
+    return;
+  }
+
+  const existingButtonsById = new Map();
+  for (const node of Array.from(container.children)) {
+    if (!(node instanceof HTMLButtonElement) || !node.classList.contains('choice')) {
+      continue;
+    }
+    if (!node.dataset.id) {
+      continue;
+    }
+    existingButtonsById.set(node.dataset.id, node);
+  }
+
+  const nextButtons = [];
+  order.forEach((id, index) => {
+    const pair = state.round.pairById.get(id);
+    if (!pair) {
+      return;
+    }
+
+    const label = kind === 'source' ? pair.source : pair.translation;
+    const existingButton = existingButtonsById.get(pair.id);
+    if (existingButton) {
+      existingButton.dataset.kind = kind;
+      existingButton.textContent = label;
+      existingButton.style.animationDelay = `${index * 34}ms`;
+      updateChoiceButtonState(existingButton, kind, pair.id);
+      nextButtons.push(existingButton);
+      existingButtonsById.delete(pair.id);
+      return;
+    }
+
+    nextButtons.push(buildChoiceButton({ kind, id: pair.id, label, index }));
+  });
+
+  for (const staleButton of existingButtonsById.values()) {
+    staleButton.remove();
+  }
+
+  for (const button of nextButtons) {
+    container.appendChild(button);
+  }
 }
 
 function renderChoices() {
@@ -778,28 +824,8 @@ function renderChoices() {
     return;
   }
 
-  elements.sourceChoices.textContent = '';
-  elements.translationChoices.textContent = '';
-
-  state.round.sourceOrder.forEach((id, index) => {
-    const pair = state.round.pairById.get(id);
-    if (!pair) {
-      return;
-    }
-    elements.sourceChoices.appendChild(
-      buildChoiceButton({ kind: 'source', id: pair.id, label: pair.source, index })
-    );
-  });
-
-  state.round.translationOrder.forEach((id, index) => {
-    const pair = state.round.pairById.get(id);
-    if (!pair) {
-      return;
-    }
-    elements.translationChoices.appendChild(
-      buildChoiceButton({ kind: 'translation', id: pair.id, label: pair.translation, index })
-    );
-  });
+  syncChoiceColumn(elements.sourceChoices, state.round.sourceOrder, 'source');
+  syncChoiceColumn(elements.translationChoices, state.round.translationOrder, 'translation');
 }
 
 function renderRound() {
